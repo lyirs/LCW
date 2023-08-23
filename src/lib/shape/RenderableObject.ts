@@ -1,4 +1,5 @@
 import { mat4, Mat4, vec3 } from "wgpu-matrix";
+import { Camera } from "../core/Camera";
 
 export class RenderableObject {
   public uniformBuffer: any;
@@ -57,4 +58,6 @@ export class RenderableObject {
   public get modelMatrix(): Mat4 {
     return this._modelMatrix;
   }
+
+  public render(renderPass: GPURenderPassEncoder, camera: Camera) {}
 }

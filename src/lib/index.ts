@@ -1,10 +1,12 @@
+export { Axes } from "./objects/HelperObjects/Axes";
+export { Box } from "./objects/RenderableObject/Box";
+export { Sphere } from "./objects/RenderableObject/Sphere";
 export { Vector3 } from "./math/Vector3";
 export { Camera } from "./core/Camera";
 export { CameraController } from "./components/CameraController";
 export { GPUManager } from "./core/GPUManager";
 export { Scene } from "./core/Scene";
-export { Box } from "./shape/Box";
-export { Axes } from "./shape/Axes";
 export { Color } from "./math/Color";
 export { DirectionalLight } from "./light/DirectionalLight";
 export { AmbientLight } from "./light/AmbientLight";
+export { PointLight } from "./light/PointLight";

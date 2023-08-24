@@ -17,6 +17,8 @@ camera.lookAt(new LCW.Vector3(0, 0, 10), new LCW.Vector3(0, 0, 0));
 new LCW.CameraController(camera, canvas);
 
 const box = new LCW.Box();
+const sphere = new LCW.Sphere();
+sphere.setPosition(new LCW.Vector3(4, 0, 0));
 const axes = new LCW.Axes(5);
 
 const ambientLight = new LCW.AmbientLight();
@@ -27,11 +29,19 @@ const directionalLight = new LCW.DirectionalLight();
 directionalLight.setIntensity(0.5);
 directionalLight.setColor(new LCW.Color("#ffff00"));
 
+const pointLight = new LCW.PointLight();
+pointLight.setIntensity(3);
+pointLight.setRadius(2);
+pointLight.setPosition(new LCW.Vector3(0, 1.2, 0));
+pointLight.setColor(new LCW.Color("#ff0000"));
+
 const scene = new LCW.Scene();
 scene.addObject(box);
+scene.addObject(sphere);
 scene.addObject(axes);
 scene.addLight(ambientLight);
 scene.addLight(directionalLight);
+scene.addLight(pointLight);
 scene.setStats();
 
 // 渲染
@@ -51,6 +61,10 @@ const config = {
   环境光颜色: "#b8fffa",
   直射光强度: 0.5,
   直射光颜色: "#ffff00",
+  点光源强度: 3,
+  点光源颜色: "#ff0000",
+  点光源半径: 2,
+  点光源Y: 1.2,
 };
 gui.add(config, "环境光强度", 0, 1, 0.01).onChange((value: number) => {
   ambientLight.setIntensity(value);
@@ -64,6 +78,19 @@ gui.add(config, "直射光强度", 0, 5, 0.05).onChange((value: number) => {
 });
 gui.addColor(config, "直射光颜色").onChange((color: string) => {
   directionalLight.setColor(new LCW.Color(color));
+});
+
+gui.add(config, "点光源强度", 0, 20, 0.01).onChange((value: number) => {
+  pointLight.setIntensity(value);
+});
+gui.addColor(config, "点光源颜色").onChange((color: string) => {
+  pointLight.setColor(new LCW.Color(color));
+});
+gui.add(config, "点光源半径", 0, 5, 0.01).onChange((value: number) => {
+  pointLight.setRadius(value);
+});
+gui.add(config, "点光源Y", -3, 3, 0.01).onChange((value: number) => {
+  pointLight.setPosition(new LCW.Vector3(0, value, 0));
 });
 
 window.addEventListener("resize", () => {

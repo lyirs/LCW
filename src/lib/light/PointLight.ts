@@ -41,5 +41,13 @@ export class PointLight extends BaseLight {
 
   public setRadius(radius: number) {
     this.radius = radius;
+    this.array[7] = this.radius;
+  }
+
+  public setPosition(position: Vector3) {
+    this.position = position;
+    this.array[0] = this.position.x;
+    this.array[1] = this.position.y;
+    this.array[2] = this.position.z;
   }
 }

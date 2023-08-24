@@ -1,13 +1,13 @@
 import Stats from "stats.js";
 import { LightType } from "../helper/light";
 import { BaseLight } from "../light/BaseLight";
-import { BaseGeometry } from "../shape/BaseGeometry";
+import { GeometryBase } from "../objects/GeometryBase";
 import { Camera } from "./Camera";
 import { GPUManager } from "./GPUManager";
 
 export class Scene {
   private stats: Stats | undefined;
-  private objects: BaseGeometry[] = []; // 保存场景中的所有对象
+  private objects: GeometryBase[] = []; // 保存场景中的所有对象
   private device: GPUDevice;
   private context: GPUCanvasContext;
   private format: GPUTextureFormat;
@@ -51,7 +51,7 @@ export class Scene {
     this.view = this.texture.createView();
   }
 
-  addObject(object: BaseGeometry) {
+  addObject(object: GeometryBase) {
     this.objects.push(object);
   }
 

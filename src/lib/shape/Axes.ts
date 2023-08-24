@@ -3,8 +3,9 @@ import fragWGSL from "./shader/axes.frag.wgsl?raw";
 import { CreateGPUBufferF32, CreateUniformBUffer } from "../helper/gpuBuffer";
 import { Camera } from "../core/Camera";
 import { Mat4, mat4, vec3 } from "wgpu-matrix";
-import { RenderableObject } from "./RenderableObject";
 import { GPUManager } from "../core/GPUManager";
+import { Vector3 } from "../math/Vector3";
+import { BaseGeometry } from "./BaseGeometry";
 
 // prettier-ignore
 const axesVertexArray = new Float32Array([
@@ -16,7 +17,7 @@ const axesVertexArray = new Float32Array([
   0, 0, 1, 1,
 ]);
 
-export class Axes extends RenderableObject {
+export class Axes extends BaseGeometry {
   public pipeline: GPURenderPipeline;
   public uniformBuffer: any;
   public uniformBindGroup: any;
@@ -31,7 +32,7 @@ export class Axes extends RenderableObject {
 
     this.device = device;
 
-    this.setScale({ x: length, y: length, z: length });
+    this.setScale(new Vector3(length));
 
     this.vertexBuffer = CreateGPUBufferF32(device, axesVertexArray);
 

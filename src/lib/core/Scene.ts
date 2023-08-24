@@ -1,17 +1,17 @@
 import Stats from "stats.js";
 import { LightType } from "../helper/light";
 import { BaseLight } from "../light/BaseLight";
-import { RenderableObject } from "../shape/RenderableObject";
+import { BaseGeometry } from "../shape/BaseGeometry";
 import { Camera } from "./Camera";
 import { GPUManager } from "./GPUManager";
 
 export class Scene {
   private stats: Stats | undefined;
-  private objects: RenderableObject[] = []; // 保存场景中的所有对象
+  private objects: BaseGeometry[] = []; // 保存场景中的所有对象
   private device: GPUDevice;
   private context: GPUCanvasContext;
   private format: GPUTextureFormat;
-
+  private texture: GPUTexture;
   private depthTexture: GPUTexture; // 记录深度贴图
   private view: GPUTextureView; // 记录视图
 
@@ -31,7 +31,7 @@ export class Scene {
     //   height: canvas.height,
     //   depthOrArrayLayers: 1,
     // };
-    const size = [canvas.width, canvas.height, 1];  // 这里的单位为texel（纹素）
+    const size = [canvas.width, canvas.height, 1]; // 这里的单位为texel（纹素）
     this.sampleCount = gpuManager.sampleCount;
 
     this.depthTexture = this.device.createTexture({
@@ -41,17 +41,17 @@ export class Scene {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
-    const texture = this.device.createTexture({
+    this.texture = this.device.createTexture({
       size: [canvas.width, canvas.height],
       sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
       format: this.format,
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
-    this.view = texture.createView();
+    this.view = this.texture.createView();
   }
 
-  addObject(object: RenderableObject) {
+  addObject(object: BaseGeometry) {
     this.objects.push(object);
   }
 
@@ -115,5 +115,28 @@ export class Scene {
     stats.showPanel(mode);
     document.body.appendChild(stats.dom);
     this.stats = stats;
+  }
+
+  public resize(camera: Camera) {
+    const gpuManager = GPUManager.getInstance();
+    let canvas = gpuManager.canvas as HTMLCanvasElement;
+    canvas.width = window.innerWidth * window.devicePixelRatio;
+    canvas.height = window.innerHeight * window.devicePixelRatio;
+    this.texture.destroy();
+    this.texture = this.device.createTexture({
+      size: [canvas.width, canvas.height],
+      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
+      format: this.format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    this.view = this.texture.createView();
+    this.depthTexture.destroy();
+    this.depthTexture = this.device.createTexture({
+      size: [canvas.width, canvas.height],
+      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
+      format: "depth24plus",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    camera.aspect = canvas.width / canvas.height;
   }
 }

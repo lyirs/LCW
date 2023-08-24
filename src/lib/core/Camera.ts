@@ -1,15 +1,20 @@
 import { mat4, Mat4, vec3 } from "wgpu-matrix";
+import { Vector3 } from "../math/Vector3";
 
 export class Camera {
-  public _eyePosition = { x: 0, y: 0, z: 0 };
-  private _center = { x: 0, y: 0, z: 0 };
-  private _up = { x: 0, y: 1, z: 0 };
+  public _eyePosition = new Vector3(0, 0, 0);
+  private _center = new Vector3(0, 0, 0);
+  private _up = new Vector3(0, 1, 0);
   private _projectionMatrix: Mat4 = mat4.identity();
   private _viewMatrix: Mat4 = mat4.identity();
   private _viewProjectionMatrix: Mat4 = mat4.identity();
   private _angularSpeed: number = 0.01;
   private _phi: number = Math.PI / 2;
   private _theta: number = Math.PI / 2;
+  private _aspect: number = 1;
+  private _fov: number = (60 / 180) * Math.PI;
+  private _near: number = 0.1;
+  private _far: number = 100.0;
 
   private static ZOOM_IN_FACTOR = 1.05;
   private static ZOOM_OUT_FACTOR = 0.95;
@@ -30,7 +35,27 @@ export class Camera {
     near: number = 0.1,
     far: number = 100.0
   ) {
-    const projectionMatrix = mat4.perspective(fov, aspect, near, far); // 创建一个透视投影矩阵
+    this._fov = fov;
+    this._aspect = aspect;
+    this._near = near;
+    this._far = far;
+    const projectionMatrix = mat4.perspective(
+      this._fov,
+      this._aspect,
+      this._near,
+      this._far
+    ); // 创建一个透视投影
+    this._projectionMatrix = projectionMatrix;
+  }
+
+  public set aspect(aspect: number) {
+    this._aspect = aspect;
+    const projectionMatrix = mat4.perspective(
+      this._fov,
+      this._aspect,
+      this._near,
+      this._far
+    );
     this._projectionMatrix = projectionMatrix;
   }
 
@@ -55,9 +80,9 @@ export class Camera {
   }
 
   public lookAt(
-    eyePosition = { x: 0, y: 0, z: -10 },
-    center = { x: 0, y: 0, z: 0 },
-    up = { x: 0, y: 1, z: 0 }
+    eyePosition = new Vector3(0, 0, -10),
+    center = new Vector3(0, 0, 0),
+    up = new Vector3(0, 1, 0)
   ) {
     const viewMatrix = mat4.lookAt(
       vec3.fromValues(eyePosition.x, eyePosition.y, eyePosition.z),
@@ -77,12 +102,12 @@ export class Camera {
     return this._viewProjectionMatrix;
   }
 
-  public set eye(eye: { x: 0; y: 0; z: 0 }) {
+  public set eye(eye: Vector3) {
     this._eyePosition = eye;
   }
 
   public rotateAroundObject_xz(
-    objectPosition: { x: number; y: number; z: number },
+    objectPosition: Vector3,
     radius: number,
     deltaTime: number
   ) {
@@ -91,7 +116,7 @@ export class Camera {
     const newX = objectPosition.x + radius * Math.cos(angle);
     const newZ = objectPosition.z + radius * Math.sin(angle);
 
-    this.lookAt({ x: newX, y: this._eyePosition.y, z: newZ }, objectPosition);
+    this.lookAt(new Vector3(newX, this._eyePosition.y, newZ), objectPosition);
   }
 
   public rotateAroundCenter(deltaX: number, deltaY: number) {
@@ -116,7 +141,7 @@ export class Camera {
     const y = radius * Math.cos(this._phi);
     const z = radius * Math.sin(this._phi) * Math.sin(this._theta);
 
-    this.lookAt({ x: x, y: y, z: z }, this._center, { x: 0, y: 1, z: 0 });
+    this.lookAt(new Vector3(x, y, z), this._center, new Vector3(0, 1, 0));
   }
 
   public mouseZoom(delta: number) {

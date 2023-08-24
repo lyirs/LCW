@@ -1,7 +1,8 @@
 import { Camera } from "../core/Camera";
+import { Vector3 } from "../math/Vector3";
 
 export class BaseObject {
-  public position: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  public position: Vector3 = new Vector3(0, 0, 0);
 
   constructor() {}
 

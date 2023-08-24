@@ -1,3 +1,4 @@
+export { Vector3 } from "./math/Vector3";
 export { Camera } from "./core/Camera";
 export { CameraController } from "./components/CameraController";
 export { GPUManager } from "./core/GPUManager";

@@ -12,7 +12,7 @@ const aspect = canvas.width / canvas.height;
 
 const camera = new LCW.Camera();
 camera.perspective(aspect);
-camera.lookAt({ x: 0, y: 0, z: 10 }, { x: 0, y: 0, z: 0 });
+camera.lookAt(new LCW.Vector3(0, 0, 10), new LCW.Vector3(0, 0, 0));
 
 new LCW.CameraController(camera, canvas);
 
@@ -34,17 +34,12 @@ scene.addLight(ambientLight);
 scene.addLight(directionalLight);
 scene.setStats();
 
-// box.setRotation({ x: 1, y: 1, z: 0 });
-// axes.setRotation({ x: 1, y: 1, z: 0 });
-
 // 渲染
 const render = () => {
   const now = performance.now();
-  directionalLight.setPosition({
-    x: Math.cos(now / 1500),
-    y: 0,
-    z: Math.sin(now / 1500),
-  });
+  directionalLight.setPosition(
+    new LCW.Vector3(Math.cos(now / 1500), 0, Math.sin(now / 1500))
+  );
   scene.render(camera);
   requestAnimationFrame(render);
 };
@@ -69,4 +64,8 @@ gui.add(config, "直射光强度", 0, 5, 0.05).onChange((value: number) => {
 });
 gui.addColor(config, "直射光颜色").onChange((color: string) => {
   directionalLight.setColor(new LCW.Color(color));
+});
+
+window.addEventListener("resize", () => {
+  scene.resize(camera);
 });

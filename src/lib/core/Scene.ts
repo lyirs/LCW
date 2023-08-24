@@ -1,14 +1,9 @@
 import Stats from "stats.js";
+import { LightType } from "../helper/light";
 import { BaseLight } from "../light/BaseLight";
 import { RenderableObject } from "../shape/RenderableObject";
 import { Camera } from "./Camera";
 import { GPUManager } from "./GPUManager";
-
-enum LightType {
-  DIRECTIONAL,
-  POINT,
-  SPOT,
-}
 
 export class Scene {
   private stats: Stats | undefined;
@@ -31,8 +26,12 @@ export class Scene {
     this.format = gpuManager.format as GPUTextureFormat;
 
     const canvas = gpuManager.canvas as HTMLCanvasElement;
-    const size = { width: canvas.width, height: canvas.height };
-
+    // const size = {
+    //   width: canvas.width,
+    //   height: canvas.height,
+    //   depthOrArrayLayers: 1,
+    // };
+    const size = [canvas.width, canvas.height, 1];  // 这里的单位为texel（纹素）
     this.sampleCount = gpuManager.sampleCount;
 
     this.depthTexture = this.device.createTexture({
@@ -63,6 +62,9 @@ export class Scene {
       this.lights.set(light.type, lightsOfType);
     }
     lightsOfType.push(light);
+    for (let i = 0; i < this.objects.length; i++) {
+      this.objects[i].setLightBuffer(this.lights);
+    }
   }
 
   render(camera: Camera) {

@@ -1,7 +1,10 @@
 import { mat4, Mat4, vec3 } from "wgpu-matrix";
 import { Camera } from "../core/Camera";
+import { LightType } from "../helper/light";
+import { BaseLight } from "../light/BaseLight";
+import { BaseObject } from "./BaseObject";
 
-export class RenderableObject {
+export class RenderableObject extends BaseObject {
   public uniformBuffer: any;
   public uniformBindGroup: any;
   public position: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
@@ -9,7 +12,9 @@ export class RenderableObject {
   public rotation: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
   protected _modelMatrix: Mat4 = mat4.identity();
 
-  constructor() {}
+  constructor() {
+    super();
+  }
 
   public set(
     position: { x: number; y: number; z: number },
@@ -58,6 +63,8 @@ export class RenderableObject {
   public get modelMatrix(): Mat4 {
     return this._modelMatrix;
   }
+
+  public setLightBuffer(lights: Map<LightType, BaseLight[]>) {}
 
   public render(renderPass: GPURenderPassEncoder, camera: Camera) {}
 }

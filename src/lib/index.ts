@@ -5,3 +5,5 @@ export { Scene } from "./core/Scene";
 export { Box } from "./shape/Box";
 export { Axes } from "./shape/Axes";
 export { Color } from "./math/Color";
+export { DirectionalLight } from "./light/DirectionalLight";
+export { AmbientLight } from "./light/AmbientLight";

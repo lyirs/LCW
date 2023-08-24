@@ -1,10 +1,10 @@
-export const createComputePipeline = (
+export const createComputePipeline = async (
   device: GPUDevice,
   label: string,
   layouts: GPUBindGroupLayout[],
   shader: string
-): GPUComputePipeline => {
-  return device.createComputePipeline({
+): Promise<GPUComputePipeline> => {
+  return device.createComputePipelineAsync({
     label: `${label}`,
     layout: device.createPipelineLayout({
       label: `${label}`,

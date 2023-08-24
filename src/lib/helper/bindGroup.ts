@@ -12,7 +12,42 @@ type BindGroupEntrys = {
 
 type BindGroupEntry = BindGroupBufferEntry | BindGroupEntrys;
 
-export const createBindGroup = (
+type bindGroupLayoutEntry = {
+  binding: number;
+  visibility: GPUShaderStageFlags;
+};
+
+export const CreateBindGroupLayout = (
+  device: GPUDevice,
+  shaderStages: GPUShaderStageFlags[]
+): GPUBindGroupLayout => {
+  const entries = shaderStages.map((stage, index) => ({
+    binding: index,
+    visibility: stage,
+  }));
+
+  return device.createBindGroupLayout({
+    entries: entries.map((entry) => ({
+      binding: entry.binding,
+      visibility: entry.visibility,
+      buffer: { type: "uniform" },
+    })),
+  });
+};
+
+// device.createBindGroupLayout({
+//   entries: [
+//     {
+//       binding: 0,
+//       visibility: GPUShaderStage.VERTEX,
+//       buffer: {
+//         type: "uniform",
+//       },
+//     },
+//   ],
+// });
+
+export const CreateBindGroup = (
   device: GPUDevice,
   pipeline: GPURenderPipeline | GPUComputePipeline,
   bindGroupLayoutIndex: number,
@@ -41,7 +76,7 @@ export const createBindGroup = (
   });
 };
 
-export const createBindGroupWithLayout = (
+export const CreateBindGroupWithLayout = (
   device: GPUDevice,
   layout: GPUBindGroupLayout,
   entries: BindGroupEntry[]

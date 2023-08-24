@@ -1,12 +1,42 @@
+import { LightType } from "../helper/light";
+import { Color } from "../math/Color";
 import { BaseLight } from "./BaseLight";
-enum LightType {
-  DIRECTIONAL,
-  POINT,
-  SPOT,
-}
+
 export class DirectionalLight extends BaseLight {
-  constructor(color: { r: number; g: number; b: number }, intensity: number) {
+  public array = new Float32Array(8);
+  constructor(
+    direction: { x: number; y: number; z: number } = { x: 0, y: 10, z: 0 },
+    color: Color = new Color(1, 1, 1),
+    intensity: number = 1
+  ) {
     super(color, intensity);
+    this.position = direction;
     this.type = LightType.DIRECTIONAL;
+    this.array[0] = this.position.x;
+    this.array[1] = this.position.y;
+    this.array[2] = this.position.z;
+    this.array[3] = this.intensity;
+    this.array[4] = this.color.r;
+    this.array[5] = this.color.g;
+    this.array[6] = this.color.b;
+  }
+
+  public setPosition(position: { x: number; y: number; z: number }) {
+    this.position = position;
+    this.array[0] = this.position.x;
+    this.array[1] = this.position.y;
+    this.array[2] = this.position.z;
+  }
+
+  public setColor(color: Color) {
+    this.color = color;
+    this.array[4] = color.r;
+    this.array[5] = color.g;
+    this.array[6] = color.b;
+  }
+
+  public setIntensity(intensity: number) {
+    this.intensity = intensity;
+    this.array[3] = intensity;
   }
 }

@@ -25,8 +25,8 @@ export class GPUManager {
       throw new Error("当前浏览器不支持WebGPU");
     }
     // 创建canvas
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = window.innerWidth * window.devicePixelRatio;
+    canvas.height = window.innerHeight * window.devicePixelRatio;
     const context = canvas.getContext("webgpu") as GPUCanvasContext;
     // 请求WebGPU适配器与GPU设备
     const adapter = (await navigator.gpu.requestAdapter()) as GPUAdapter;

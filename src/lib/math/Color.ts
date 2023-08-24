@@ -2,9 +2,10 @@ export class Color {
   r: number;
   g: number;
   b: number;
+  a: number = 1.0;
   constructor(hex: string);
-  constructor(r: number, g: number, b: number);
-  constructor(r: string | number, g?: number, b?: number) {
+  constructor(r: number, g: number, b: number, a?: number);
+  constructor(r: string | number, g?: number, b?: number, a?: number) {
     if (typeof r === "string") {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(r);
       if (result) {
@@ -22,11 +23,14 @@ export class Color {
       this.r = r;
       this.g = g;
       this.b = b;
+      if (a) {
+        this.a = a;
+      }
     }
   }
 
   clone() {
-    return new Color(this.r, this.g, this.b);
+    return new Color(this.r, this.g, this.b, this.a);
   }
 
   lerp(targetColor: Color, alpha: number) {

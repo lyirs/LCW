@@ -9,6 +9,17 @@ import {
   CreateUniformBUffer,
 } from "../helper/gpuBuffer";
 import { RenderableObject } from "./RenderableObject";
+import { BaseLight } from "../light/BaseLight";
+import { DirectionalLight } from "../light/DirectionalLight";
+import { lightBindGroupEntries, LightType } from "../helper/light";
+import {
+  CreateBindGroupLayout,
+  CreateBindGroupWithLayout,
+} from "../helper/bindGroup";
+import {
+  createRenderPipeLineWithLayout,
+  setPipelineVertexBuffer,
+} from "../helper/renderProgram";
 
 const boxVertexSize = 8 * 4;
 const boxPositionOffset = 0;
@@ -64,6 +75,9 @@ export class Box extends RenderableObject {
   public pipeline: GPURenderPipeline;
   public uniformBuffer: any;
   public uniformBindGroup: any;
+  public lightBindGroup: any;
+  private vsBindGroupLayout: any;
+  private lightBindGroupLayout: any;
   public vertexBuffer: GPUBuffer;
   public indexBuffer: GPUBuffer;
   public vertexCount: number;
@@ -73,6 +87,11 @@ export class Box extends RenderableObject {
   public width: number;
   public height: number;
   public depth: number;
+  private lightBindGroupEntries: any;
+  public directionalLights: BaseLight[] | undefined;
+  public directionalBuffer: any;
+  public ambientLights: BaseLight[] | undefined;
+  public ambientBuffer: any;
 
   constructor(width: number = 1, height: number = 1, depth: number = 1) {
     super();
@@ -95,99 +114,122 @@ export class Box extends RenderableObject {
     this.vertexBuffer = CreateGPUBufferF32(device, this.vertices);
     this.indexBuffer = CreateGPUBufferUint16(device, this.indices);
 
-    this.pipeline = device.createRenderPipeline({
-      // 布局
-      layout: "auto",
-      // 顶点着色器
-      vertex: {
-        module: device.createShaderModule({
-          code: vertWGSL,
-        }),
-        entryPoint: "main",
-        buffers: [
-          // 缓冲区集合，其中一个元素对应一个缓冲对象
-          {
-            arrayStride: boxVertexSize, // 顶点长度 以字节为单位
-            attributes: [
-              // position
-              {
-                shaderLocation: 0,
-                offset: boxPositionOffset,
-                format: "float32x3",
-              },
-              // normal
-              {
-                shaderLocation: 1,
-                offset: boxNormalOffset,
-                format: "float32x3",
-              },
-              // uv
-              {
-                shaderLocation: 2,
-                offset: boxUvOffset,
-                format: "float32x2",
-              },
-            ],
-          },
-        ],
-      },
-      // 片元着色器
-      fragment: {
-        module: device.createShaderModule({
-          code: fragWGSL,
-        }),
-        entryPoint: "main",
-        // 输出颜色
-        targets: [
-          {
-            format: format,
-          },
-        ],
-      },
-      // 图元类型
-      primitive: {
-        topology: "triangle-list",
-        cullMode: "back",
-      },
-      // 深度
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: "less",
-        format: "depth24plus",
-      },
-      // 多重采样
-      multisample:
-        gpuManager.sampleCount > 1
-          ? {
-              count: 4,
-            }
-          : undefined,
-    });
+    this.vsBindGroupLayout = CreateBindGroupLayout(device, [
+      GPUShaderStage.VERTEX,
+    ]);
 
-    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4);
+    this.lightBindGroupLayout = CreateBindGroupLayout(device, [
+      GPUShaderStage.FRAGMENT,
+      GPUShaderStage.FRAGMENT,
+      GPUShaderStage.FRAGMENT,
+    ]);
 
-    this.uniformBindGroup = device.createBindGroup({
-      label: "uniform",
-      layout: this.pipeline.getBindGroupLayout(0),
-      entries: [
-        {
-          binding: 0,
-          resource: {
-            buffer: this.uniformBuffer,
-          },
-        },
-      ],
+    const pipelineBuffer = setPipelineVertexBuffer(
+      ["float32x3", "float32x3", "float32x2"],
+      [boxPositionOffset, boxNormalOffset, boxUvOffset]
+    );
+
+    this.pipeline = createRenderPipeLineWithLayout(
+      "boxPipeline",
+      [this.vsBindGroupLayout, this.lightBindGroupLayout],
+      vertWGSL,
+      fragWGSL,
+      pipelineBuffer
+    );
+
+    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4 * 2);
+
+    this.uniformBindGroup = CreateBindGroupWithLayout(
+      this.device,
+      this.vsBindGroupLayout,
+      [{ binding: 0, resource: this.uniformBuffer }]
+    );
+
+    this.lightBindGroupEntries = lightBindGroupEntries(this.device);
+  }
+
+  public setLightBuffer(lights: Map<LightType, BaseLight[]>): void {
+    {
+      this.ambientLights = lights.get(LightType.AMBIENT);
+      if (this.ambientLights) {
+        this.ambientBuffer = CreateUniformBUffer(
+          this.device,
+          this.ambientLights.length * 8 * 4 // vec3 position; f32 intensity; vec3 direction; size4 pad
+        );
+        this.lightBindGroupEntries[0].resource.buffer = this.ambientBuffer;
+        const lightsArray = new Float32Array(8 * this.ambientLights.length);
+        for (let i = 0; i < this.ambientLights.length; i++) {
+          lightsArray.set(
+            (this.ambientLights[i] as DirectionalLight).array,
+            i * 8
+          );
+        }
+        this.device.queue.writeBuffer(this.ambientBuffer, 0, lightsArray);
+      }
+    }
+    {
+      this.directionalLights = lights.get(LightType.DIRECTIONAL);
+      if (this.directionalLights) {
+        this.directionalBuffer = CreateUniformBUffer(
+          this.device,
+          this.directionalLights.length * 8 * 4 // vec3 position; f32 intensity; vec3 direction; size4 pad
+        );
+        this.lightBindGroupEntries[2].resource.buffer = this.directionalBuffer;
+        const lightsArray = new Float32Array(8 * this.directionalLights.length);
+        for (let i = 0; i < this.directionalLights.length; i++) {
+          lightsArray.set(
+            (this.directionalLights[i] as DirectionalLight).array,
+            i * 8
+          );
+        }
+        this.device.queue.writeBuffer(this.directionalBuffer, 0, lightsArray);
+      }
+    }
+
+    this.lightBindGroup = this.device.createBindGroup({
+      layout: this.lightBindGroupLayout, // @group(1)
+      entries: this.lightBindGroupEntries,
     });
+  }
+
+  private updateLightBuffer() {
+    if (this.ambientLights) {
+      const lightsArray = new Float32Array(8 * this.ambientLights.length);
+      for (let i = 0; i < this.ambientLights.length; i++) {
+        lightsArray.set(
+          (this.ambientLights[i] as DirectionalLight).array,
+          i * 8
+        );
+      }
+      this.device.queue.writeBuffer(this.ambientBuffer, 0, lightsArray);
+    }
+    if (this.directionalLights) {
+      const lightsArray = new Float32Array(8 * this.directionalLights.length);
+      for (let i = 0; i < this.directionalLights.length; i++) {
+        lightsArray.set(
+          (this.directionalLights[i] as DirectionalLight).array,
+          i * 8
+        );
+      }
+      this.device.queue.writeBuffer(this.directionalBuffer, 0, lightsArray);
+    }
   }
 
   public render(renderPass: GPURenderPassEncoder, camera: Camera) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
-
     const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;
-
     this.device.queue.writeBuffer(this.uniformBuffer, 0, mvpMatrix);
+
+    let normalMatrix = mat4.copy(this.modelMatrix);
+    normalMatrix = mat4.invert(normalMatrix);
+    normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
+    this.device.queue.writeBuffer(this.uniformBuffer, 4 * 4 * 4, normalMatrix);
+
+    this.updateLightBuffer();
+
     renderPass.setPipeline(this.pipeline);
     renderPass.setBindGroup(0, this.uniformBindGroup);
+    renderPass.setBindGroup(1, this.lightBindGroup);
     renderPass.setVertexBuffer(0, this.vertexBuffer);
     renderPass.setIndexBuffer(this.indexBuffer, "uint16");
     renderPass.drawIndexed(this.vertexCount);

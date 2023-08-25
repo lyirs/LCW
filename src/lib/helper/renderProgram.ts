@@ -40,14 +40,14 @@ export const setPipelineVertexBuffer = (
     ];
   }
 
-  return buffers;
+  return buffers as Iterable<GPUVertexBufferLayout | null>;
 };
 
 export const createRenderPipeLine = (
   label: string,
   vsShader: string,
   fsShader: string,
-  buffers: any[]
+  buffers: Iterable<GPUVertexBufferLayout | null>
 ) => {
   const gpuManager = GPUManager.getInstance();
   const device = gpuManager.device as GPUDevice;
@@ -102,7 +102,8 @@ export const createRenderPipeLineWithLayout = (
   layout: GPUBindGroupLayout[],
   vsShader: string,
   fsShader: string,
-  buffers: any[]
+  buffers: Iterable<GPUVertexBufferLayout | null>,
+  castShadow: boolean = false
 ) => {
   const gpuManager = GPUManager.getInstance();
   const device = gpuManager.device as GPUDevice;
@@ -141,7 +142,7 @@ export const createRenderPipeLineWithLayout = (
     depthStencil: {
       depthWriteEnabled: true,
       depthCompare: "less",
-      format: "depth24plus",
+      format: castShadow ? "depth32float" : "depth24plus",
     },
     // 多重采样
     multisample:

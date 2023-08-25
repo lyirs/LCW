@@ -27,7 +27,7 @@ export const CreateBindGroupLayout = (
   }));
 
   return device.createBindGroupLayout({
-    entries: entries.map((entry) => ({
+    entries: entries.map((entry: bindGroupLayoutEntry) => ({
       binding: entry.binding,
       visibility: entry.visibility,
       buffer: { type: "uniform" },

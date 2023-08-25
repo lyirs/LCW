@@ -6,6 +6,7 @@ import { BaseLight } from "./BaseLight";
 export class PointLight extends BaseLight {
   public array = new Float32Array(8);
   public radius: number;
+  public position: Vector3;
 
   constructor(
     position: Vector3 = new Vector3(0, 0, 0),

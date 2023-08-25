@@ -4,6 +4,7 @@ import { Vector3 } from "../math/Vector3";
 import { BaseLight } from "./BaseLight";
 
 export class DirectionalLight extends BaseLight {
+  public position: Vector3;
   public array = new Float32Array(8);
   constructor(
     direction: Vector3 = new Vector3(0, 10, 0),

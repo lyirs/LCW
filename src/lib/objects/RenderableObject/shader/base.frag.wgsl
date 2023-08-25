@@ -1,12 +1,15 @@
 @group(1) @binding(0) var<uniform> ambientLight : array<vec4<f32>, 2>;
 @group(1) @binding(1) var<uniform> pointLight : array<vec4<f32>, 2>;
 @group(1) @binding(2) var<uniform> directionLight : array<vec4<f32>, 2>;
+@group(1) @binding(3) var shadowMap: texture_depth_2d;  // 深度贴图类型
+@group(1) @binding(4) var shadowSampler: sampler_comparison;  // 对比采样类型
 
 @fragment
 fn main(
     @location(0) fragPosition: vec4<f32>,
     @location(1) fragNormal: vec3<f32>,
     @location(2) fragUV: vec2<f32>,
+    @location(3) shadowPos: vec3<f32>,
 ) -> @location(0) vec4<f32> {
     var objectColor = vec3<f32>(1.0, 1.0, 1.0);
     var ambientLightColor = vec3(1.0, 1.0, 1.0);  // 环境光
@@ -32,7 +35,23 @@ fn main(
     // 也就是说，当光源在物体的后方时，不会产生漫反射效果。
     // 得到的diffuse值在0到1之间，表示了定向光对于这个片元的漫反射强度
     var diffuse: f32 = max(dot(N, DL), 0.0);
-    lightResult += dirLightColor * directionIntensity * diffuse;
+    // 阴影
+    var shadow = 0.0;
+    let size = f32(textureDimensions(shadowMap).x);
+    for (var y: i32 = -1 ; y <= 1 ; y = y + 1) {
+        for (var x: i32 = -1 ; x <= 1 ; x = x + 1) {
+            let offset = vec2<f32>(f32(x) / size, f32(y) / size);   // 对于每个点，首先计算出其相对于当前点的偏移量。偏移量被归一化到0-1之间，代表了在阴影贴图上的相对位置
+                // `textureSampleCompare`函数会将给定的深度值（`shadowPos.z - 0.005`）与从深度贴图上采样得到的深度值进行比较，如果给定的深度值大于采样值（即片元位于光源视角看到的表面之后），则返回1，否则返回0。这个结果被加到`shadow`上
+            shadow = shadow + textureSampleCompare(
+                shadowMap,   // 阴影贴图
+                shadowSampler,  // 比较采样器 用于读取深度贴图并进行深度比较
+                shadowPos.xy + offset,  // 采样位置，即在深度贴图上的坐标
+                shadowPos.z - 0.005 // 待比较的深度值。 稍微减小对比深度 防止阴影失真（shadow acne）
+            );
+        }
+    }
+    shadow = shadow / 9.0;
+    lightResult += dirLightColor * directionIntensity * shadow * diffuse;
 
     // 点光源
     var pointPosition = pointLight[0].xyz;

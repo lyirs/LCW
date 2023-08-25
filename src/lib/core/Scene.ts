@@ -7,16 +7,16 @@ import { GPUManager } from "./GPUManager";
 
 export class Scene {
   private stats: Stats | undefined;
-  private objects: GeometryBase[] = []; // 保存场景中的所有对象
   private device: GPUDevice;
   private context: GPUCanvasContext;
   private format: GPUTextureFormat;
   private texture: GPUTexture;
   private depthTexture: GPUTexture; // 记录深度贴图
-  private view: GPUTextureView; // 记录视图
+  private shadowDepthTexture: GPUTexture;
 
   private sampleCount: number;
 
+  private objects: GeometryBase[] = []; //
   private lights: Map<LightType, BaseLight[]> = new Map();
 
   constructor() {
@@ -41,18 +41,25 @@ export class Scene {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
+    this.shadowDepthTexture = this.device.createTexture({
+      size,
+      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
+      format: "depth32float",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
     this.texture = this.device.createTexture({
       size: [canvas.width, canvas.height],
       sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
       format: this.format,
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
-
-    this.view = this.texture.createView();
   }
 
   addObject(object: GeometryBase) {
-    this.objects.push(object);
+    if (!this.objects.includes(object)) {
+      this.objects.push(object);
+    }
   }
 
   addLight(light: BaseLight) {
@@ -73,12 +80,18 @@ export class Scene {
     }
     const commandEncoder = this.device.createCommandEncoder();
 
-    const renderPass = commandEncoder.beginRenderPass({
+    this.objects.forEach((object) => {
+      if (object.castShadow) {
+        object.renderShadow(commandEncoder);
+      }
+    });
+
+    const renderPassDescriptor = {
       colorAttachments: [
         {
           view:
             this.sampleCount > 1
-              ? this.view
+              ? this.texture.createView()
               : this.context.getCurrentTexture().createView(),
           resolveTarget:
             this.sampleCount > 1
@@ -90,20 +103,30 @@ export class Scene {
         },
       ],
       depthStencilAttachment: {
-        view: this.depthTexture.createView(),
+        view: this.depthTexture.createView(), // 默认使用depthTexture
         depthClearValue: 1.0,
         depthLoadOp: "clear",
         depthStoreOp: "store",
       },
-    });
+    } as GPURenderPassDescriptor;
+
+    const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
 
     this.objects.forEach((object) => {
+      if (object.castShadow) {
+        renderPassDescriptor.depthStencilAttachment!.view =
+          this.shadowDepthTexture.createView();
+      } else {
+        renderPassDescriptor.depthStencilAttachment!.view =
+          this.depthTexture.createView();
+      }
       if (object.render) {
         object.render(renderPass, camera);
       }
     });
 
     renderPass.end();
+
     this.device.queue.submit([commandEncoder.finish()]);
     if (this.stats) {
       this.stats.end();
@@ -129,12 +152,18 @@ export class Scene {
       format: this.format,
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
-    this.view = this.texture.createView();
     this.depthTexture.destroy();
     this.depthTexture = this.device.createTexture({
       size: [canvas.width, canvas.height],
       sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
       format: "depth24plus",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    this.shadowDepthTexture.destroy();
+    this.shadowDepthTexture = this.device.createTexture({
+      size: [canvas.width, canvas.height],
+      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
+      format: "depth32float",
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
     camera.aspect = canvas.width / canvas.height;

@@ -14,6 +14,7 @@ export class Vector3 {
     this.x = x;
     this.y = y;
     this.z = z;
+    return this;
   }
 
   public set r(r: number) {
@@ -38,5 +39,12 @@ export class Vector3 {
 
   public get b(): number {
     return this.z;
+  }
+
+  public copy(v: Vector3) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+    return this;
   }
 }

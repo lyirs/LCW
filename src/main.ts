@@ -17,16 +17,22 @@ camera.lookAt(new LCW.Vector3(0, 0, 10), new LCW.Vector3(0, 0, 0));
 new LCW.CameraController(camera, canvas);
 
 const box = new LCW.Box();
+box.castShadow = true;
 const sphere = new LCW.Sphere();
 sphere.setPosition(new LCW.Vector3(4, 0, 0));
 const axes = new LCW.Axes(5);
+const plane = new LCW.Box();
+plane.y = -1;
+plane.setScale(new LCW.Vector3(10, 0.1, 10));
+plane.castShadow = true;
 
 const ambientLight = new LCW.AmbientLight();
 ambientLight.setIntensity(0.5);
 ambientLight.setColor(new LCW.Color("#b8fffa"));
 
 const directionalLight = new LCW.DirectionalLight();
-directionalLight.setIntensity(0.5);
+directionalLight.setPosition(new LCW.Vector3(10, 6, 0));
+directionalLight.setIntensity(1);
 directionalLight.setColor(new LCW.Color("#ffff00"));
 
 const pointLight = new LCW.PointLight();
@@ -39,17 +45,18 @@ const scene = new LCW.Scene();
 scene.addObject(box);
 scene.addObject(sphere);
 scene.addObject(axes);
-scene.addLight(ambientLight);
+scene.addObject(plane);
+// scene.addLight(ambientLight);
 scene.addLight(directionalLight);
-scene.addLight(pointLight);
+// scene.addLight(pointLight);
 scene.setStats();
 
 // 渲染
 const render = () => {
-  const now = performance.now();
-  directionalLight.setPosition(
-    new LCW.Vector3(Math.cos(now / 1500), 0, Math.sin(now / 1500))
-  );
+  // const now = performance.now();
+  // directionalLight.setPosition(
+  //   new LCW.Vector3(Math.cos(now / 1500), 1, Math.sin(now / 1500))
+  // );
   scene.render(camera);
   requestAnimationFrame(render);
 };
@@ -59,8 +66,11 @@ const gui = new GUI();
 const config = {
   环境光强度: 0.5,
   环境光颜色: "#b8fffa",
-  直射光强度: 0.5,
+  直射光强度: 1,
   直射光颜色: "#ffff00",
+  直射光X: 10,
+  直射光Y: 6,
+  直射光Z: 0,
   点光源强度: 3,
   点光源颜色: "#ff0000",
   点光源半径: 2,
@@ -78,6 +88,33 @@ gui.add(config, "直射光强度", 0, 5, 0.05).onChange((value: number) => {
 });
 gui.addColor(config, "直射光颜色").onChange((color: string) => {
   directionalLight.setColor(new LCW.Color(color));
+});
+gui.add(config, "直射光X", -10, 10, 0.05).onChange((value: number) => {
+  directionalLight.setPosition(
+    new LCW.Vector3(
+      value,
+      directionalLight.position.y,
+      directionalLight.position.z
+    )
+  );
+});
+gui.add(config, "直射光Y", 0, 10, 0.05).onChange((value: number) => {
+  directionalLight.setPosition(
+    new LCW.Vector3(
+      directionalLight.position.x,
+      value,
+      directionalLight.position.z
+    )
+  );
+});
+gui.add(config, "直射光Z", -10, 10, 0.05).onChange((value: number) => {
+  directionalLight.setPosition(
+    new LCW.Vector3(
+      directionalLight.position.x,
+      directionalLight.position.y,
+      value
+    )
+  );
 });
 
 gui.add(config, "点光源强度", 0, 20, 0.01).onChange((value: number) => {

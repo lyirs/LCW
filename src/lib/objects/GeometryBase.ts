@@ -122,7 +122,18 @@ export class GeometryBase {
     return this._modelMatrix;
   }
 
+  public setPipeline(
+    lightBindGroupLayout: GPUBindGroupLayout,
+    lightProjectionBuffer: GPUBuffer
+  ){}
   public setLightBuffer(lights: Map<LightType, BaseLight[]>): void {}
-  public render(renderPass: GPURenderPassEncoder, camera: Camera) {}
-  public renderShadow(commandEncoder: GPUCommandEncoder) {}
+  public render(
+    renderPass: GPURenderPassEncoder,
+    camera: Camera,
+    lightBindGroup: GPUBindGroup
+  ) {}
+  public renderShadow(
+    commandEncoder: GPUCommandEncoder,
+    shadowDepthView: GPUTextureView
+  ) {}
 }

@@ -84,7 +84,7 @@ export class Axes extends GeometryBase {
       depthStencil: {
         depthWriteEnabled: true,
         depthCompare: "less",
-        format: "depth24plus",
+        format: "depth32float",
       },
       // 多重采样
       multisample:
@@ -115,7 +115,8 @@ export class Axes extends GeometryBase {
 
   public render(
     renderPass: GPURenderPassEncoder,
-    camera: Camera
+    camera: Camera,
+    lightBindGroup: GPUBindGroup
   ) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
 

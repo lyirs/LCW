@@ -85,7 +85,7 @@ export const createRenderPipeLine = (
     depthStencil: {
       depthWriteEnabled: true,
       depthCompare: "less",
-      format: "depth24plus",
+      format: "depth32float",
     },
     // 多重采样
     multisample:
@@ -103,7 +103,6 @@ export const createRenderPipeLineWithLayout = (
   vsShader: string,
   fsShader: string,
   buffers: Iterable<GPUVertexBufferLayout | null>,
-  castShadow: boolean = false
 ) => {
   const gpuManager = GPUManager.getInstance();
   const device = gpuManager.device as GPUDevice;
@@ -142,7 +141,7 @@ export const createRenderPipeLineWithLayout = (
     depthStencil: {
       depthWriteEnabled: true,
       depthCompare: "less",
-      format: castShadow ? "depth32float" : "depth24plus",
+      format: "depth32float",
     },
     // 多重采样
     multisample:

@@ -104,36 +104,16 @@ const createSphere = (
 };
 
 export class Sphere extends RenderableObject {
-  public vertexBuffer: GPUBuffer;
-  public indexBuffer: GPUBuffer;
   public vertexCount: number;
   private vertices: Float32Array;
   private indices: Uint16Array;
-  constructor(
-    radius: number = 1,
-    widthSegments: number = 32,
-    heightSegments: number = 16,
-    randomness: number = 0
-  ) {
+  public static vertex = createSphere(1, 32, 16, 0).vertices;
+  public static index = createSphere(1, 32, 16, 0).indices;
+
+  constructor() {
     super();
-
-    this.vertices = createSphere(
-      radius,
-      widthSegments,
-      heightSegments,
-      randomness
-    ).vertices;
-
-    this.indices = createSphere(
-      radius,
-      widthSegments,
-      heightSegments,
-      randomness
-    ).indices;
-
+    this.vertices = createSphere(1, 32, 16, 0).vertices;
+    this.indices = createSphere(1, 32, 16, 0).indices;
     this.vertexCount = this.indices.length;
-
-    this.vertexBuffer = CreateGPUBufferF32(this.device, this.vertices);
-    this.indexBuffer = CreateGPUBufferUint16(this.device, this.indices);
   }
 }

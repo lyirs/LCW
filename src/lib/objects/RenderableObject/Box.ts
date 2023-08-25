@@ -50,29 +50,16 @@ const boxIndexArray = new Uint16Array([
 ])
 
 export class Box extends RenderableObject {
-  public vertexBuffer: GPUBuffer;
-  public indexBuffer: GPUBuffer;
   public vertexCount: number;
   private vertices: Float32Array;
   private indices: Uint16Array;
-  public width: number;
-  public height: number;
-  public depth: number;
+  public static vertex = boxVertexArray(0.5, 0.5, 0.5);
+  public static index = boxIndexArray;
 
-  constructor(width: number = 1, height: number = 1, depth: number = 1) {
+  constructor() {
     super();
-
-    this.width = width;
-    this.height = height;
-    this.depth = depth;
-
-    this.vertices = boxVertexArray(this.width, this.height, this.depth);
-
+    this.vertices = boxVertexArray(1, 1, 1);
     this.indices = boxIndexArray;
-
     this.vertexCount = this.indices.length;
-
-    this.vertexBuffer = CreateGPUBufferF32(this.device, this.vertices);
-    this.indexBuffer = CreateGPUBufferUint16(this.device, this.indices);
   }
 }

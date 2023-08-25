@@ -43,8 +43,8 @@ pointLight.setColor(new LCW.Color("#ff0000"));
 
 const scene = new LCW.Scene();
 scene.addObject(box);
-scene.addObject(sphere);
-scene.addObject(axes);
+// scene.addObject(sphere);
+// scene.addObject(axes);
 scene.addObject(plane);
 // scene.addLight(ambientLight);
 scene.addLight(directionalLight);

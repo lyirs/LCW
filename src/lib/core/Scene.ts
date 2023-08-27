@@ -1,11 +1,11 @@
 import Stats from "stats.js";
 import { vec3, mat4 } from "wgpu-matrix";
+import { CreateBindGroupWithLayout } from "../helper/bindGroup";
 import {
-  CreateBindGroup,
-  CreateBindGroupLayout,
-  CreateBindGroupWithLayout,
-} from "../helper/bindGroup";
-import { CreateGPUBufferF32, CreateUniformBUffer } from "../helper/gpuBuffer";
+  CreateGPUBufferF32,
+  CreateGPUBufferUint16,
+  CreateUniformBUffer,
+} from "../helper/gpuBuffer";
 import { lightBindGroupEntries, LightType } from "../helper/light";
 import {
   createRenderPipeLineWithLayout,
@@ -22,6 +22,7 @@ import vertWGSL from "./shader/base.vert.wgsl?raw";
 import fragWGSL from "./shader/base.frag.wgsl?raw";
 import { Box } from "../objects/RenderableObject/Box";
 import { Sphere } from "../objects/RenderableObject/Sphere";
+import { Axes } from "../objects/HelperObjects/Axes";
 
 export class Scene {
   private stats: Stats | undefined;
@@ -30,36 +31,32 @@ export class Scene {
   private format: GPUTextureFormat;
   private texture: GPUTexture;
   private renderDepthTexture: GPUTexture; // 记录深度贴图
-
   private sampleCount: number;
-
-  private objects: GeometryBase[] = []; //
-  private lights: Map<LightType, BaseLight[]> = new Map();
-  ambientLights: BaseLight[] | undefined;
-  ambientBuffer: GPUBuffer | undefined;
-  lightBindGroupEntries: any;
-  pointLights: BaseLight[] | undefined;
-  pointBuffer: GPUBuffer | undefined;
-  directionalLights: BaseLight[] | undefined;
-  directionalBuffer: GPUBuffer | undefined;
-  lightBindGroup: GPUBindGroup | undefined;
-  lightBindGroupLayout: GPUBindGroupLayout | null = null;
-  lightProjectionBuffer: GPUBuffer;
-  shadowDepthView: GPUTextureView;
-  lessSampler: GPUSampler;
-  vsBindGroupLayout: GPUBindGroupLayout;
-  uniformBuffer: GPUBuffer;
-  vertexBuffer: any;
-  shadowPipeline: GPURenderPipeline;
-  pipeline: GPURenderPipeline;
-  modelMatrix: GPUBuffer;
-  uniformBindGroup: any;
-  shadowBindGroup: any;
-  boxBuffer: { vertex: GPUBuffer; index: GPUBuffer };
-  sphereBuffer: { vertex: GPUBuffer; index: GPUBuffer };
-  boxCount: number = 0;
-  sphereCount: number = 0;
-  normalMatrix: GPUBuffer;
+  public objects: GeometryBase[] = []; //
+  public helperObjects: GeometryBase[] = []; //
+  public lights: Map<LightType, BaseLight[]> = new Map();
+  private ambientLights: BaseLight[] | undefined;
+  private ambientBuffer: GPUBuffer | undefined;
+  private lightBindGroupEntries: any;
+  private pointLights: BaseLight[] | undefined;
+  private pointBuffer: GPUBuffer | undefined;
+  private directionalLights: BaseLight[] | undefined;
+  private directionalBuffer: GPUBuffer | undefined;
+  private lightBindGroup: GPUBindGroup | undefined;
+  private lightBindGroupLayout: GPUBindGroupLayout | null = null;
+  private lightViewProjectionBuffer: GPUBuffer;
+  private shadowDepthView: GPUTextureView;
+  private lessSampler: GPUSampler;
+  private vsBindGroupLayout: GPUBindGroupLayout;
+  private uniformBuffer: GPUBuffer;
+  private shadowPipeline: GPURenderPipeline;
+  private pipeline: GPURenderPipeline;
+  private modelMatrix: GPUBuffer;
+  private uniformBindGroup: any;
+  private shadowBindGroup: any;
+  private boxBuffer: { vertex: GPUBuffer; index: GPUBuffer };
+  private sphereBuffer: { vertex: GPUBuffer; index: GPUBuffer };
+  private normalMatrix: GPUBuffer;
 
   constructor() {
     const gpuManager = GPUManager.getInstance();
@@ -189,46 +186,24 @@ export class Scene {
     });
 
     // 物体buffer
+
     this.boxBuffer = {
-      vertex: this.device.createBuffer({
-        label: "GPUBuffer store vertex",
-        size: Box.vertex.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      }),
-      index: this.device.createBuffer({
-        label: "GPUBuffer store vertex index",
-        size: Box.index.byteLength,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-      }),
+      vertex: CreateGPUBufferF32(this.device, Box.vertex),
+      index: CreateGPUBufferUint16(this.device, Box.index),
     };
 
     this.sphereBuffer = {
-      vertex: this.device.createBuffer({
-        label: "GPUBuffer store vertex",
-        size: Sphere.vertex.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      }),
-      index: this.device.createBuffer({
-        label: "GPUBuffer store vertex index",
-        size: Sphere.index.byteLength,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-      }),
+      vertex: CreateGPUBufferF32(this.device, Sphere.vertex),
+      index: CreateGPUBufferUint16(this.device, Sphere.index),
     };
-
-    this.device.queue.writeBuffer(this.boxBuffer.vertex, 0, Box.vertex);
-    this.device.queue.writeBuffer(this.boxBuffer.index, 0, Box.index);
-    this.device.queue.writeBuffer(this.sphereBuffer.vertex, 0, Sphere.vertex);
-    this.device.queue.writeBuffer(this.sphereBuffer.index, 0, Sphere.index);
 
     // 全局矩阵
     this.modelMatrix = this.device.createBuffer({
-      label: "GPUBuffer store n*4x4 matrix",
       size: 4 * 4 * 4, // 4 x 4 x float32 x NUM
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
     this.normalMatrix = this.device.createBuffer({
-      label: "GPUBuffer store n*4x4 matrix",
       size: 4 * 4 * 4, // 4 x 4 x float32 x NUM
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
@@ -242,10 +217,13 @@ export class Scene {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
-    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4 * 2);
+    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4 * 2); // 4*4*4 viewMatrix ; 4*4*4 projectionMatrix
 
-    // 光照
-    this.lightProjectionBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4);
+    //
+    this.lightViewProjectionBuffer = CreateUniformBUffer(
+      this.device,
+      4 * 4 * 4
+    );
     this.lightBindGroupEntries = lightBindGroupEntries(this.device);
 
     // 阴影
@@ -268,7 +246,7 @@ export class Scene {
       this.vsBindGroupLayout,
       [
         { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightProjectionBuffer },
+        { binding: 1, resource: this.lightViewProjectionBuffer },
         { binding: 2, resource: this.modelMatrix },
         { binding: 3, resource: this.normalMatrix },
       ]
@@ -279,7 +257,7 @@ export class Scene {
       this.vsBindGroupLayout,
       [
         { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightProjectionBuffer },
+        { binding: 1, resource: this.lightViewProjectionBuffer },
         { binding: 2, resource: this.modelMatrix },
         { binding: 3, resource: this.normalMatrix },
       ]
@@ -291,25 +269,19 @@ export class Scene {
     });
   }
 
-  addObject(object: Box | Sphere) {
+  addObject(object: Box | Sphere | Axes) {
+    if (!this.helperObjects.includes(object) && object instanceof Axes) {
+      this.helperObjects.push(object);
+    }
     if (!this.objects.includes(object)) {
       this.objects.push(object);
 
-      if (object instanceof Box) {
-        this.boxCount++;
-      }
-      if (object instanceof Sphere) {
-        this.sphereCount++;
-      }
-
       // 全局矩阵
       this.modelMatrix = this.device.createBuffer({
-        label: "GPUBuffer store n*4x4 matrix",
         size: 4 * 4 * 4 * this.objects.length, // 4 x 4 x float32 x NUM
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       this.normalMatrix = this.device.createBuffer({
-        label: "GPUBuffer store n*4x4 matrix",
         size: 4 * 4 * 4 * this.objects.length, // 4 x 4 x float32 x NUM
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
@@ -319,7 +291,18 @@ export class Scene {
         this.vsBindGroupLayout,
         [
           { binding: 0, resource: this.uniformBuffer },
-          { binding: 1, resource: this.lightProjectionBuffer },
+          { binding: 1, resource: this.lightViewProjectionBuffer },
+          { binding: 2, resource: this.modelMatrix },
+          { binding: 3, resource: this.normalMatrix },
+        ]
+      );
+
+      this.shadowBindGroup = CreateBindGroupWithLayout(
+        this.device,
+        this.vsBindGroupLayout,
+        [
+          { binding: 0, resource: this.uniformBuffer },
+          { binding: 1, resource: this.lightViewProjectionBuffer },
           { binding: 2, resource: this.modelMatrix },
           { binding: 3, resource: this.normalMatrix },
         ]
@@ -407,7 +390,7 @@ export class Scene {
             lightProjectionMatrix
           );
           this.device.queue.writeBuffer(
-            this.lightProjectionBuffer,
+            this.lightViewProjectionBuffer,
             0,
             lightProjectionMatrix as Float32Array
           );
@@ -480,7 +463,7 @@ export class Scene {
           lightProjectionMatrix
         );
         this.device.queue.writeBuffer(
-          this.lightProjectionBuffer,
+          this.lightViewProjectionBuffer,
           0,
           lightProjectionMatrix as Float32Array
         );
@@ -494,15 +477,13 @@ export class Scene {
     }
     const modelMatrixArray = new Float32Array(4 * 4 * this.objects.length);
     const normalMatrixArray = new Float32Array(4 * 4 * this.objects.length);
-    this.objects.forEach((object, index) => {
-      if (object.castShadow) {
-        modelMatrixArray.set(object.modelMatrix, index * 4 * 4);
 
-        let normalMatrix = mat4.copy(object.modelMatrix);
-        normalMatrix = mat4.invert(normalMatrix);
-        normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
-        normalMatrixArray.set(normalMatrix, index * 4 * 4);
-      }
+    this.objects.forEach((object, index) => {
+      modelMatrixArray.set(object.modelMatrix, index * 4 * 4);
+      let normalMatrix = mat4.copy(object.modelMatrix);
+      normalMatrix = mat4.invert(normalMatrix);
+      normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
+      normalMatrixArray.set(normalMatrix, index * 4 * 4);
     });
 
     this.updateLightBuffer();
@@ -517,6 +498,7 @@ export class Scene {
       4 * 4 * 4,
       camera.viewMatrix as Float32Array
     );
+
     this.device.queue.writeBuffer(this.modelMatrix, 0, modelMatrixArray);
     this.device.queue.writeBuffer(this.normalMatrix, 0, normalMatrixArray);
 
@@ -589,20 +571,22 @@ export class Scene {
     renderPass.setBindGroup(1, this.lightBindGroup!);
 
     this.objects.forEach((object, index) => {
-      if (object.castShadow) {
-        if (object instanceof Box) {
-          // set box vertex
-          renderPass.setVertexBuffer(0, this.boxBuffer.vertex);
-          renderPass.setIndexBuffer(this.boxBuffer.index, "uint16");
-          renderPass.drawIndexed(Box.index.length, 1, 0, 0, index);
-        }
-        if (object instanceof Sphere) {
-          // set sphere vertex
-          renderPass.setVertexBuffer(0, this.sphereBuffer.vertex);
-          renderPass.setIndexBuffer(this.sphereBuffer.index, "uint16");
-          renderPass.drawIndexed(Sphere.index.length, 1, 0, 0, index);
-        }
+      if (object instanceof Box) {
+        // set box vertex
+        renderPass.setVertexBuffer(0, this.boxBuffer.vertex);
+        renderPass.setIndexBuffer(this.boxBuffer.index, "uint16");
+        renderPass.drawIndexed(Box.index.length, 1, 0, 0, index);
       }
+      if (object instanceof Sphere) {
+        // set sphere vertex
+        renderPass.setVertexBuffer(0, this.sphereBuffer.vertex);
+        renderPass.setIndexBuffer(this.sphereBuffer.index, "uint16");
+        renderPass.drawIndexed(Sphere.index.length, 1, 0, 0, index);
+      }
+    });
+
+    this.helperObjects.forEach((object) => {
+      (object as Axes).render(renderPass, camera);
     });
 
     renderPass.end();

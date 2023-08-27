@@ -51,9 +51,9 @@ const boxIndexArray = new Uint16Array([
 
 export class Box extends RenderableObject {
   public vertexCount: number;
-  private vertices: Float32Array;
+  private vertices: Float32Array; 
   private indices: Uint16Array;
-  public static vertex = boxVertexArray(0.5, 0.5, 0.5);
+  public static vertex = boxVertexArray(1, 1, 1);
   public static index = boxIndexArray;
 
   constructor() {

@@ -17,7 +17,7 @@ type bindGroupLayoutEntry = {
   visibility: GPUShaderStageFlags;
 };
 
-export const CreateBindGroupLayout = (
+export const CreateUniformBindGroupLayout = (
   device: GPUDevice,
   shaderStages: GPUShaderStageFlags[]
 ): GPUBindGroupLayout => {

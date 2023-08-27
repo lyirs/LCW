@@ -12,7 +12,7 @@ const aspect = canvas.width / canvas.height;
 
 const camera = new LCW.Camera();
 camera.perspective(aspect);
-camera.lookAt(new LCW.Vector3(0, 0, 10), new LCW.Vector3(0, 0, 0));
+camera.lookAt(new LCW.Vector3(0, 0, 20), new LCW.Vector3(0, 0, 0));
 
 new LCW.CameraController(camera, canvas);
 
@@ -20,6 +20,7 @@ const box = new LCW.Box();
 box.castShadow = true;
 const sphere = new LCW.Sphere();
 sphere.setPosition(new LCW.Vector3(4, 0, 0));
+sphere.castShadow = true;
 const axes = new LCW.Axes(5);
 const plane = new LCW.Box();
 plane.y = -1;
@@ -27,11 +28,11 @@ plane.setScale(new LCW.Vector3(10, 0.1, 10));
 plane.castShadow = true;
 
 const ambientLight = new LCW.AmbientLight();
-ambientLight.setIntensity(0.5);
+ambientLight.setIntensity(0.2);
 ambientLight.setColor(new LCW.Color("#b8fffa"));
 
 const directionalLight = new LCW.DirectionalLight();
-directionalLight.setPosition(new LCW.Vector3(10, 6, 0));
+directionalLight.setPosition(new LCW.Vector3(0, 2, 10));
 directionalLight.setIntensity(1);
 directionalLight.setColor(new LCW.Color("#ffff00"));
 
@@ -43,20 +44,20 @@ pointLight.setColor(new LCW.Color("#ff0000"));
 
 const scene = new LCW.Scene();
 scene.addObject(box);
-// scene.addObject(sphere);
-// scene.addObject(axes);
+scene.addObject(sphere);
+scene.addObject(axes);
 scene.addObject(plane);
-// scene.addLight(ambientLight);
+scene.addLight(ambientLight);
 scene.addLight(directionalLight);
 // scene.addLight(pointLight);
 scene.setStats();
 
 // 渲染
 const render = () => {
-  // const now = performance.now();
-  // directionalLight.setPosition(
-  //   new LCW.Vector3(Math.cos(now / 1500), 1, Math.sin(now / 1500))
-  // );
+  const now = performance.now();
+  directionalLight.setPosition(
+    new LCW.Vector3(3 * Math.cos(now / 1500), 1, 3 * Math.sin(now / 1500))
+  );
   scene.render(camera);
   requestAnimationFrame(render);
 };
@@ -64,13 +65,13 @@ requestAnimationFrame(render);
 
 const gui = new GUI();
 const config = {
-  环境光强度: 0.5,
+  环境光强度: 0.2,
   环境光颜色: "#b8fffa",
   直射光强度: 1,
   直射光颜色: "#ffff00",
-  直射光X: 10,
-  直射光Y: 6,
-  直射光Z: 0,
+  直射光X: 0,
+  直射光Y: 2,
+  直射光Z: 10,
   点光源强度: 3,
   点光源颜色: "#ff0000",
   点光源半径: 2,

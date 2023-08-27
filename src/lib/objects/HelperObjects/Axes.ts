@@ -116,7 +116,6 @@ export class Axes extends GeometryBase {
   public render(
     renderPass: GPURenderPassEncoder,
     camera: Camera,
-    lightBindGroup: GPUBindGroup
   ) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
 

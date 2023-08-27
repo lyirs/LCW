@@ -80,7 +80,7 @@ export class Camera {
   }
 
   public lookAt(
-    eyePosition = new Vector3(0, 0, -10),
+    eyePosition = new Vector3(0, 0, 0),
     center = new Vector3(0, 0, 0),
     up = new Vector3(0, 1, 0)
   ) {
@@ -120,6 +120,7 @@ export class Camera {
   }
 
   public rotateAroundCenter(deltaX: number, deltaY: number) {
+    // TODO
     const horizontalAngle = deltaX * this._angularSpeed;
     const verticalAngle = deltaY * this._angularSpeed;
 

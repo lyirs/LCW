@@ -1,7 +1,4 @@
 import { mat4, Mat4, vec3 } from "wgpu-matrix";
-import { Camera } from "../core/Camera";
-import { LightType } from "../helper/light";
-import { BaseLight } from "../light/BaseLight";
 import { Vector3 } from "../math/Vector3";
 
 export class GeometryBase {
@@ -121,19 +118,4 @@ export class GeometryBase {
   public get modelMatrix(): Mat4 {
     return this._modelMatrix;
   }
-
-  public setPipeline(
-    lightBindGroupLayout: GPUBindGroupLayout,
-    lightProjectionBuffer: GPUBuffer
-  ){}
-  public setLightBuffer(lights: Map<LightType, BaseLight[]>): void {}
-  public render(
-    renderPass: GPURenderPassEncoder,
-    camera: Camera,
-    lightBindGroup: GPUBindGroup
-  ) {}
-  public renderShadow(
-    commandEncoder: GPUCommandEncoder,
-    shadowDepthView: GPUTextureView
-  ) {}
 }

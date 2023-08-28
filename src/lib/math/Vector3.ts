@@ -47,4 +47,12 @@ export class Vector3 {
     this.z = v.z;
     return this;
   }
+
+  public get lengthSquraed() {
+    return this.x * this.x + this.y * this.y + this.z * this.z;
+  }
+
+  public get length() {
+    return Math.sqrt(this.lengthSquraed);
+  }
 }

@@ -1,3 +1,5 @@
+import { GPUManager } from "../core/GPUManager";
+
 type BindGroupBufferEntry = {
   binding: GPUIndex32;
   resource: GPUBuffer;
@@ -12,27 +14,49 @@ type BindGroupEntrys = {
 
 type BindGroupEntry = BindGroupBufferEntry | BindGroupEntrys;
 
-type bindGroupLayoutEntry = {
-  binding: number;
-  visibility: GPUShaderStageFlags;
+type ResourceType =
+  | "uniform"
+  | "storage"
+  | "read-only-storage"
+  | "depth"
+  | "float"
+  | "comparison";
+
+const RESOURCE_MAP: Record<ResourceType, any> = {
+  uniform: { buffer: { type: "uniform" } },
+  storage: { buffer: { type: "storage" } },
+  "read-only-storage": { buffer: { type: "read-only-storage" } },
+  depth: { texture: { sampleType: "depth" } },
+  float: { texture: { sampleType: "float" } },
+  comparison: { sampler: { type: "comparison" } },
 };
 
-export const CreateUniformBindGroupLayout = (
-  device: GPUDevice,
-  shaderStages: GPUShaderStageFlags[]
-): GPUBindGroupLayout => {
-  const entries = shaderStages.map((stage, index) => ({
+function createBindGroupLayout(
+  types: ResourceType[],
+  visibility: GPUShaderStageFlags
+): GPUBindGroupLayout {
+  const gpuManager = GPUManager.getInstance();
+  const device = gpuManager.device as GPUDevice;
+
+  const entries = types.map((type: ResourceType, index) => ({
     binding: index,
-    visibility: stage,
+    visibility: visibility,
+    ...RESOURCE_MAP[type],
   }));
 
-  return device.createBindGroupLayout({
-    entries: entries.map((entry: bindGroupLayoutEntry) => ({
-      binding: entry.binding,
-      visibility: entry.visibility,
-      buffer: { type: "uniform" },
-    })),
-  });
+  return device.createBindGroupLayout({ entries });
+}
+
+export const CreateVertexBindGroupLayout = (
+  types: ResourceType[]
+): GPUBindGroupLayout => {
+  return createBindGroupLayout(types, GPUShaderStage.VERTEX);
+};
+
+export const CreateFragmentBindGroupLayout = (
+  types: ResourceType[]
+): GPUBindGroupLayout => {
+  return createBindGroupLayout(types, GPUShaderStage.FRAGMENT);
 };
 
 // device.createBindGroupLayout({
@@ -48,11 +72,12 @@ export const CreateUniformBindGroupLayout = (
 // });
 
 export const CreateBindGroup = (
-  device: GPUDevice,
   pipeline: GPURenderPipeline | GPUComputePipeline,
   bindGroupLayoutIndex: number,
   entries: BindGroupEntry[]
 ): GPUBindGroup => {
+  const gpuManager = GPUManager.getInstance();
+  const device = gpuManager.device as GPUDevice;
   return device.createBindGroup({
     layout: pipeline.getBindGroupLayout(bindGroupLayoutIndex),
     entries: entries.map((entry) => {
@@ -77,10 +102,11 @@ export const CreateBindGroup = (
 };
 
 export const CreateBindGroupWithLayout = (
-  device: GPUDevice,
   layout: GPUBindGroupLayout,
   entries: BindGroupEntry[]
 ): GPUBindGroup => {
+  const gpuManager = GPUManager.getInstance();
+  const device = gpuManager.device as GPUDevice;
   return device.createBindGroup({
     layout: layout,
     entries: entries.map((entry) => {

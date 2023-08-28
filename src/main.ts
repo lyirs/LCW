@@ -17,6 +17,7 @@ camera.lookAt(new LCW.Vector3(0, 0, 20), new LCW.Vector3(0, 0, 0));
 new LCW.CameraController(camera, canvas);
 
 const box = new LCW.Box();
+box.wireframe = true;
 box.castShadow = true;
 const sphere = new LCW.Sphere();
 sphere.setPosition(new LCW.Vector3(4, 0, 0));
@@ -50,6 +51,7 @@ scene.addObject(plane);
 scene.addLight(ambientLight);
 scene.addLight(directionalLight);
 // scene.addLight(pointLight);
+
 scene.setStats();
 
 // 渲染

@@ -1,9 +1,12 @@
+import { GPUManager } from "../core/GPUManager";
+
 export const createComputePipeline = async (
-  device: GPUDevice,
   label: string,
   layouts: GPUBindGroupLayout[],
   shader: string
 ): Promise<GPUComputePipeline> => {
+  const gpuManager = GPUManager.getInstance();
+  const device = gpuManager.device as GPUDevice;
   return device.createComputePipelineAsync({
     label: `${label}`,
     layout: device.createPipelineLayout({

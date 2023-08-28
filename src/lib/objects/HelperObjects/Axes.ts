@@ -2,7 +2,7 @@ import vertWGSL from "./shader/axes.vert.wgsl?raw";
 import fragWGSL from "./shader/axes.frag.wgsl?raw";
 import {
   CreateGPUBufferF32,
-  CreateUniformBUffer,
+  CreateUniformBuffer,
 } from "../../helper/gpuBuffer";
 import { Camera } from "../../core/Camera";
 import { Mat4, mat4, vec3 } from "wgpu-matrix";
@@ -37,7 +37,7 @@ export class Axes extends GeometryBase {
 
     this.setScale(new Vector3(length));
 
-    this.vertexBuffer = CreateGPUBufferF32(device, axesVertexArray);
+    this.vertexBuffer = CreateGPUBufferF32(axesVertexArray);
 
     this.pipeline = device.createRenderPipeline({
       // 布局
@@ -95,7 +95,7 @@ export class Axes extends GeometryBase {
           : undefined,
     });
 
-    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4);
+    this.uniformBuffer = CreateUniformBuffer(4 * 4 * 4);
 
     this.uniformBindGroup = device.createBindGroup({
       label: "uniform",
@@ -113,10 +113,7 @@ export class Axes extends GeometryBase {
     this.vertexCount = 6;
   }
 
-  public render(
-    renderPass: GPURenderPassEncoder,
-    camera: Camera,
-  ) {
+  public render(renderPass: GPURenderPassEncoder, camera: Camera) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
 
     const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;

@@ -1,4 +1,5 @@
 import { mat4, Mat4, vec3 } from "wgpu-matrix";
+import { Color } from "../math/Color";
 import { Vector3 } from "../math/Vector3";
 
 export class GeometryBase {
@@ -7,6 +8,8 @@ export class GeometryBase {
   public position: Vector3 = new Vector3(0, 0, 0);
   public scale: Vector3 = new Vector3(1, 1, 1);
   public rotation: Vector3 = new Vector3(0, 0, 0);
+  public color: Color = new Color(1, 1, 1);
+
   protected _modelMatrix: Mat4 = mat4.identity();
   public castShadow: boolean = false;
 

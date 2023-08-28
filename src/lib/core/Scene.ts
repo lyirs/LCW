@@ -1,69 +1,78 @@
 import Stats from "stats.js";
 import { vec3, mat4 } from "wgpu-matrix";
-import { CreateBindGroupWithLayout } from "../helper/bindGroup";
 import {
-  CreateGPUBufferF32,
-  CreateGPUBufferUint16,
-  CreateUniformBUffer,
-} from "../helper/gpuBuffer";
-import { lightBindGroupEntries, LightType } from "../helper/light";
+  CreateBindGroupWithLayout,
+  CreateFragmentBindGroupLayout,
+  CreateVertexBindGroupLayout,
+} from "../helper/bindGroup";
+import { CreateStorageBuffer, CreateUniformBuffer } from "../helper/gpuBuffer";
 import {
-  createRenderPipeLineWithLayout,
+  getLightViewProjectionMatrix,
+  Light,
+  lightBindGroupEntries,
+  LightConfigs,
+  LightType,
+} from "../helper/light";
+import {
+  CreateRenderPassDescriptor,
+  CreateRenderPipeLineWithLayout,
+  CreateShadowRenderPassDescriptor,
+  CreateShadowRenderPipeLineWithLayout,
   setPipelineVertexBuffer,
 } from "../helper/renderProgram";
-import { AmbientLight } from "../light/AmbientLight";
-import { BaseLight } from "../light/BaseLight";
-import { DirectionalLight } from "../light/DirectionalLight";
-import { PointLight } from "../light/PointLight";
 import { GeometryBase } from "../objects/GeometryBase";
 import { Camera } from "./Camera";
 import { GPUManager } from "./GPUManager";
 import vertWGSL from "./shader/base.vert.wgsl?raw";
 import fragWGSL from "./shader/base.frag.wgsl?raw";
-import { Box } from "../objects/RenderableObject/Box";
-import { Sphere } from "../objects/RenderableObject/Sphere";
 import { Axes } from "../objects/HelperObjects/Axes";
+import {
+  CreateDepthTexture,
+  CreateShadowTexture,
+  CreateTexture,
+} from "../texture/texture";
+import { DirectionalLight } from "../light/DirectionalLight";
+import { AmbientLight } from "../light/AmbientLight";
+import { PointLight } from "../light/PointLight";
+import { Vector3 } from "../math/Vector3";
+import {
+  Renderable,
+  RenderableObject,
+} from "../objects/RenderableObject/RenderableBase";
 
 export class Scene {
-  private stats: Stats | undefined;
+  private stats: Stats | undefined; // 性能数据显示
   private device: GPUDevice;
-  private context: GPUCanvasContext;
-  private format: GPUTextureFormat;
-  private texture: GPUTexture;
-  private renderDepthTexture: GPUTexture; // 记录深度贴图
-  private sampleCount: number;
-  public objects: GeometryBase[] = []; //
-  public helperObjects: GeometryBase[] = []; //
-  public lights: Map<LightType, BaseLight[]> = new Map();
-  private ambientLights: BaseLight[] | undefined;
-  private ambientBuffer: GPUBuffer | undefined;
-  private lightBindGroupEntries: any;
-  private pointLights: BaseLight[] | undefined;
-  private pointBuffer: GPUBuffer | undefined;
-  private directionalLights: BaseLight[] | undefined;
-  private directionalBuffer: GPUBuffer | undefined;
-  private lightBindGroup: GPUBindGroup | undefined;
-  private lightBindGroupLayout: GPUBindGroupLayout | null = null;
-  private lightViewProjectionBuffer: GPUBuffer;
-  private shadowDepthView: GPUTextureView;
-  private lessSampler: GPUSampler;
+  //
+  private texture: GPUTexture; // 贴图
+  private renderDepthTexture: GPUTexture; // 深度贴图
+  // 场景物体
+  public objects: GeometryBase[] = []; // 场景物体
+  public helperObjects: GeometryBase[] = []; // 场景辅助物体
+  private uniformBuffer: GPUBuffer; // vp buffer
+  private modelMatrixBuffer: GPUBuffer; // 场景模型buffer
+  private normalMatrixBuffer: GPUBuffer; // 场景法线buffer
   private vsBindGroupLayout: GPUBindGroupLayout;
-  private uniformBuffer: GPUBuffer;
-  private shadowPipeline: GPURenderPipeline;
+  private vsBindGroup: GPUBindGroup;
+  // 光源
+  public lights: Map<LightType, Light[]> = new Map(); // 光线
+  public ambientLights: AmbientLight[] | undefined;
+  public pointLights: PointLight[] | undefined;
+  public directionalLights: DirectionalLight[] | undefined;
+  private lightBindGroupEntries: any; //
+  private lightBindGroupLayout: GPUBindGroupLayout | null = null;
+  private lightBindGroup: GPUBindGroup | undefined;
+  // 阴影
+  private lightViewProjectionBuffer: GPUBuffer; // 直射光vp buffer
+  private shadowTexture: GPUTexture;
+  private shadowBindGroup: GPUBindGroup;
+  // 渲染管线
   private pipeline: GPURenderPipeline;
-  private modelMatrix: GPUBuffer;
-  private uniformBindGroup: any;
-  private shadowBindGroup: any;
-  private boxBuffer: { vertex: GPUBuffer; index: GPUBuffer };
-  private sphereBuffer: { vertex: GPUBuffer; index: GPUBuffer };
-  private normalMatrix: GPUBuffer;
+  private shadowPipeline: GPURenderPipeline;
 
   constructor() {
     const gpuManager = GPUManager.getInstance();
     this.device = gpuManager.device as GPUDevice;
-    this.context = gpuManager.context as GPUCanvasContext;
-    this.format = gpuManager.format as GPUTextureFormat;
-
     const canvas = gpuManager.canvas as HTMLCanvasElement;
     // const size = {
     //   width: canvas.width,
@@ -71,104 +80,35 @@ export class Scene {
     //   depthOrArrayLayers: 1,
     // };
     const size = [canvas.width, canvas.height, 1]; // 这里的单位为texel（纹素）
+    // bindGroupLayout
+    this.vsBindGroupLayout = CreateVertexBindGroupLayout([
+      "uniform", // @group(0) @binding(0) var<uniform> uniforms : Uniforms
+      "uniform", // @group(0) @binding(1) var<uniform> lightProjection : mat4x4<f32>
+      "read-only-storage", // @group(0) @binding(2) var<storage> model : array<mat4x4<f32>>
+      "read-only-storage", // @group(0) @binding(3) var<storage> normal : array<mat4x4<f32>>
+    ]);
+    this.lightBindGroupLayout = CreateFragmentBindGroupLayout([
+      "uniform", // @group(1) @binding(0) var<uniform> ambientLight : array<vec4<f32>, 2>
+      "uniform", // @group(1) @binding(1) var<uniform> pointLight : array<vec4<f32>, 2>
+      "uniform", // @group(1) @binding(2) var<uniform> directionLight : array<vec4<f32>, 2>
+      "depth", // @group(1) @binding(3) var shadowMap: texture_depth_2d;
+      "comparison", // @group(1) @binding(4) var shadowSampler: sampler_comparison;
+    ]);
 
+    // 创建阴影管线
     const pipelineBuffer = setPipelineVertexBuffer(
       ["float32x3", "float32x3", "float32x2"],
       [0, 3 * 4, 6 * 4]
     );
-
-    this.vsBindGroupLayout = this.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0, // @group(0) @binding(0) var<uniform> uniforms : Uniforms
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-        {
-          binding: 1, // @group(0) @binding(1) var<uniform> lightProjection : mat4x4<f32>
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-        {
-          binding: 2, // @group(0) @binding(2) var<storage> model : array<mat4x4<f32>>
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-        {
-          binding: 3, // @group(0) @binding(3) var<storage> normal : array<mat4x4<f32>>
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-      ],
-    });
-
-    // 创建阴影管线
-    this.shadowPipeline = this.device.createRenderPipeline({
-      label: "shadow",
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [this.vsBindGroupLayout],
-      }),
-      // 只需要得到顶点深度结果，不需要片元着色器
-      vertex: {
-        module: this.device.createShaderModule({
-          code: vertWGSL,
-        }),
-        entryPoint: "shadow",
-        buffers: pipelineBuffer,
-      },
-      primitive: {
-        topology: "triangle-list",
-        cullMode: "back",
-      },
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: "less",
-        format: "depth32float",
-      },
-    });
-
-    // 创建阴影贴图
-    this.shadowDepthView = this.device
-      .createTexture({
-        size: [2048, 2048], // 阴影贴图大小
-        usage:
-          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING, // TEXTURE_BINDING 纹理可以绑定在group用作着色器中的采样纹理
-        format: "depth32float",
-      })
-      .createView();
+    this.shadowPipeline = CreateShadowRenderPipeLineWithLayout(
+      "shadow",
+      [this.vsBindGroupLayout],
+      vertWGSL,
+      pipelineBuffer
+    );
 
     // 创建渲染管线
-    this.lightBindGroupLayout = this.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0, // @group(1) @binding(0) var<uniform> ambientLight : array<vec4<f32>, 2>
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-        {
-          binding: 1, // @group(1) @binding(1) var<uniform> pointLight : array<vec4<f32>, 2>
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-        {
-          binding: 2, // @group(1) @binding(2) var<uniform> directionLight : array<vec4<f32>, 2>
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-        {
-          binding: 3, // @group(1) @binding(3) var shadowMap: texture_depth_2d;
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: "depth" },
-        },
-        {
-          binding: 4, // @group(1) @binding(4) var shadowSampler: sampler_comparison;
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: "comparison" },
-        },
-      ],
-    });
-
-    this.pipeline = createRenderPipeLineWithLayout(
+    this.pipeline = CreateRenderPipeLineWithLayout(
       "pipeline",
       [this.vsBindGroupLayout, this.lightBindGroupLayout!],
       vertWGSL,
@@ -176,299 +116,120 @@ export class Scene {
       pipelineBuffer
     );
 
+    // 贴图
+    this.texture = CreateTexture(size);
     // 深度贴图
-    this.sampleCount = gpuManager.sampleCount;
-    this.renderDepthTexture = this.device.createTexture({
-      size,
-      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
-      format: "depth32float",
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    this.renderDepthTexture = CreateDepthTexture(size);
+    // 阴影贴图
+    this.shadowTexture = CreateShadowTexture(2048, 2048);
 
-    // 物体buffer
-
-    this.boxBuffer = {
-      vertex: CreateGPUBufferF32(this.device, Box.vertex),
-      index: CreateGPUBufferUint16(this.device, Box.index),
-    };
-
-    this.sphereBuffer = {
-      vertex: CreateGPUBufferF32(this.device, Sphere.vertex),
-      index: CreateGPUBufferUint16(this.device, Sphere.index),
-    };
+    // light buffer
+    this.lightViewProjectionBuffer = CreateUniformBuffer(4 * 4 * 4); // vp矩阵
+    // uniform buffer
+    this.uniformBuffer = CreateUniformBuffer(4 * 4 * 4 * 2); // 4*4*4 viewMatrix ; 4*4*4 projectionMatrix
 
     // 全局矩阵
-    this.modelMatrix = this.device.createBuffer({
-      size: 4 * 4 * 4, // 4 x 4 x float32 x NUM
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
+    this.modelMatrixBuffer = CreateStorageBuffer(4 * 4 * 4);
+    this.normalMatrixBuffer = CreateStorageBuffer(4 * 4 * 4);
 
-    this.normalMatrix = this.device.createBuffer({
-      size: 4 * 4 * 4, // 4 x 4 x float32 x NUM
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
+    // bindgroup @group(0)
+    this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
+      { binding: 0, resource: this.uniformBuffer },
+      { binding: 1, resource: this.lightViewProjectionBuffer },
+      { binding: 2, resource: this.modelMatrixBuffer },
+      { binding: 3, resource: this.normalMatrixBuffer },
+    ]);
 
-    //
+    this.shadowBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
+      { binding: 0, resource: this.uniformBuffer },
+      { binding: 1, resource: this.lightViewProjectionBuffer },
+      { binding: 2, resource: this.modelMatrixBuffer },
+      { binding: 3, resource: this.normalMatrixBuffer },
+    ]);
 
-    this.texture = this.device.createTexture({
-      size: [canvas.width, canvas.height],
-      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
-      format: this.format,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-
-    this.uniformBuffer = CreateUniformBUffer(this.device, 4 * 4 * 4 * 2); // 4*4*4 viewMatrix ; 4*4*4 projectionMatrix
-
-    //
-    this.lightViewProjectionBuffer = CreateUniformBUffer(
-      this.device,
-      4 * 4 * 4
-    );
-    this.lightBindGroupEntries = lightBindGroupEntries(this.device);
-
-    // 阴影
-    this.lessSampler = this.device.createSampler({ compare: "less" });
-    this.lightBindGroupEntries.push(
-      {
-        binding: 3,
-        resource: this.shadowDepthView,
-      },
-      {
-        binding: 4,
-        resource: this.lessSampler,
-      }
-    );
-
-    // bindgroup
-
-    this.uniformBindGroup = CreateBindGroupWithLayout(
-      this.device,
-      this.vsBindGroupLayout,
-      [
-        { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightViewProjectionBuffer },
-        { binding: 2, resource: this.modelMatrix },
-        { binding: 3, resource: this.normalMatrix },
-      ]
-    );
-
-    this.shadowBindGroup = CreateBindGroupWithLayout(
-      this.device,
-      this.vsBindGroupLayout,
-      [
-        { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightViewProjectionBuffer },
-        { binding: 2, resource: this.modelMatrix },
-        { binding: 3, resource: this.normalMatrix },
-      ]
-    );
-
+    // bindgroup @group(1)
+    this.lightBindGroupEntries = lightBindGroupEntries(this.shadowTexture);
     this.lightBindGroup = this.device.createBindGroup({
-      layout: this.lightBindGroupLayout!, // @group(1)
+      layout: this.lightBindGroupLayout!,
       entries: this.lightBindGroupEntries,
     });
   }
 
-  addObject(object: Box | Sphere | Axes) {
+  public addObject(object: Renderable | Axes) {
     if (!this.helperObjects.includes(object) && object instanceof Axes) {
       this.helperObjects.push(object);
+      return;
     }
     if (!this.objects.includes(object)) {
       this.objects.push(object);
-
       // 全局矩阵
-      this.modelMatrix = this.device.createBuffer({
-        size: 4 * 4 * 4 * this.objects.length, // 4 x 4 x float32 x NUM
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      this.normalMatrix = this.device.createBuffer({
-        size: 4 * 4 * 4 * this.objects.length, // 4 x 4 x float32 x NUM
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-
-      this.uniformBindGroup = CreateBindGroupWithLayout(
-        this.device,
-        this.vsBindGroupLayout,
-        [
-          { binding: 0, resource: this.uniformBuffer },
-          { binding: 1, resource: this.lightViewProjectionBuffer },
-          { binding: 2, resource: this.modelMatrix },
-          { binding: 3, resource: this.normalMatrix },
-        ]
+      this.modelMatrixBuffer = CreateStorageBuffer(
+        4 * 4 * 4 * this.objects.length
       );
-
-      this.shadowBindGroup = CreateBindGroupWithLayout(
-        this.device,
-        this.vsBindGroupLayout,
-        [
-          { binding: 0, resource: this.uniformBuffer },
-          { binding: 1, resource: this.lightViewProjectionBuffer },
-          { binding: 2, resource: this.modelMatrix },
-          { binding: 3, resource: this.normalMatrix },
-        ]
+      this.normalMatrixBuffer = CreateStorageBuffer(
+        4 * 4 * 4 * this.objects.length
       );
+      this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
+        { binding: 0, resource: this.uniformBuffer },
+        { binding: 1, resource: this.lightViewProjectionBuffer },
+        { binding: 2, resource: this.modelMatrixBuffer },
+        { binding: 3, resource: this.normalMatrixBuffer },
+      ]);
+      this.shadowBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
+        { binding: 0, resource: this.uniformBuffer },
+        { binding: 1, resource: this.lightViewProjectionBuffer },
+        { binding: 2, resource: this.modelMatrixBuffer },
+        { binding: 3, resource: this.normalMatrixBuffer },
+      ]);
     }
   }
 
-  addLight(light: BaseLight) {
+  public addLight(light: Light) {
     let lightsOfType = this.lights.get(light.type);
     if (!lightsOfType) {
       lightsOfType = [];
       this.lights.set(light.type, lightsOfType);
     }
     lightsOfType.push(light);
-
     this.setLightBuffer(this.lights);
   }
 
-  public setLightBuffer(lights: Map<LightType, BaseLight[]>): void {
-    {
-      this.ambientLights = lights.get(LightType.AMBIENT);
-      if (this.ambientLights) {
-        this.ambientBuffer = CreateUniformBUffer(
-          this.device,
-          this.ambientLights.length * 8 * 4 // size12 pad; f32 intensity; vec3 color; size4 pad
-        );
-        this.lightBindGroupEntries[0].resource.buffer = this.ambientBuffer;
-        const lightsArray = new Float32Array(8 * this.ambientLights.length);
-        for (let i = 0; i < this.ambientLights.length; i++) {
-          lightsArray.set((this.ambientLights[i] as AmbientLight).array, i * 8);
-        }
-        this.device.queue.writeBuffer(this.ambientBuffer, 0, lightsArray);
-      }
-    }
-    {
-      this.pointLights = lights.get(LightType.POINT);
-      if (this.pointLights) {
-        this.pointBuffer = CreateUniformBUffer(
-          this.device,
-          this.pointLights.length * 8 * 4 // size12 pad; f32 intensity; vec3 color; size4 pad
-        );
-        this.lightBindGroupEntries[1].resource.buffer = this.pointBuffer;
-        const lightsArray = new Float32Array(8 * this.pointLights.length);
-        for (let i = 0; i < this.pointLights.length; i++) {
-          lightsArray.set((this.pointLights[i] as PointLight).array, i * 8);
-        }
-        this.device.queue.writeBuffer(this.pointBuffer, 0, lightsArray);
-      }
-    }
-    {
-      this.directionalLights = lights.get(LightType.DIRECTIONAL);
-      if (this.directionalLights) {
-        this.directionalBuffer = CreateUniformBUffer(
-          this.device,
-          this.directionalLights.length * 8 * 4 // vec3 direction; f32 intensity; vec3 color; size4 pad
-        );
-        this.lightBindGroupEntries[2].resource.buffer = this.directionalBuffer;
-        const lightsArray = new Float32Array(8 * this.directionalLights.length);
-        for (let i = 0; i < this.directionalLights.length; i++) {
-          lightsArray.set(
-            (this.directionalLights[i] as DirectionalLight).array,
-            i * 8
-          );
-        }
-        this.device.queue.writeBuffer(this.directionalBuffer, 0, lightsArray);
-        // 光线视图投影矩阵
-        {
-          const lightPosition = vec3.fromValues(
-            lightsArray[0],
-            lightsArray[1],
-            lightsArray[2]
-          );
-          const lightViewMatrix = mat4.identity();
-          mat4.lookAt(
-            lightPosition,
-            vec3.fromValues(0, 0, 0),
-            vec3.fromValues(0, 1, 0),
-            lightViewMatrix
-          );
-          const lightProjectionMatrix = mat4.identity();
-          mat4.ortho(-40, 40, -40, 40, -50, 200, lightProjectionMatrix);
-          mat4.multiply(
-            lightProjectionMatrix,
-            lightViewMatrix,
-            lightProjectionMatrix
-          );
-          this.device.queue.writeBuffer(
-            this.lightViewProjectionBuffer,
-            0,
-            lightProjectionMatrix as Float32Array
-          );
-        }
-      }
-    }
+  private handleLightBuffer(lightType: LightType, lights: Light[]): void {
+    // TODO 多光源阴影
+    const config = LightConfigs[lightType];
+    if (!lights || !lights.length) return;
 
+    config.buffer = CreateUniformBuffer(lights.length * config.size * 4);
+    this.lightBindGroupEntries[lightType].resource.buffer = config.buffer;
+    const lightsArray = new Float32Array(config.size * lights.length);
+    for (let i = 0; i < lights.length; i++) {
+      lightsArray.set(lights[i].array, i * config.size);
+    }
+    this.device.queue.writeBuffer(config.buffer, 0, lightsArray);
+
+    if (lightType === LightType.DIRECTIONAL) {
+      // 光线视图投影矩阵的更新
+      this.device.queue.writeBuffer(
+        this.lightViewProjectionBuffer,
+        0,
+        getLightViewProjectionMatrix(
+          new Vector3(lightsArray[0], lightsArray[1], lightsArray[2])
+        )
+      );
+    }
+  }
+  public setLightBuffer(lights: Map<LightType, Light[]>): void {
+    for (const lightType of Object.values(LightType) as LightType[]) {
+      this.handleLightBuffer(lightType, lights.get(lightType) as Light[]);
+    }
     this.lightBindGroup = this.device.createBindGroup({
-      layout: this.lightBindGroupLayout!, // @group(1)
+      layout: this.lightBindGroupLayout!,
       entries: this.lightBindGroupEntries,
     });
   }
 
   private updateLightBuffer() {
-    // TODO 处理多光源
-    if (this.ambientLights) {
-      const lightsArray = new Float32Array(8 * this.ambientLights.length);
-      for (let i = 0; i < this.ambientLights.length; i++) {
-        lightsArray.set((this.ambientLights[i] as AmbientLight).array, i * 8);
-      }
-      this.device.queue.writeBuffer(
-        this.ambientBuffer as GPUBuffer,
-        0,
-        lightsArray
-      );
-    }
-    if (this.pointLights) {
-      const lightsArray = new Float32Array(8 * this.pointLights.length);
-      for (let i = 0; i < this.pointLights.length; i++) {
-        lightsArray.set((this.pointLights[i] as PointLight).array, i * 8);
-      }
-      this.device.queue.writeBuffer(
-        this.pointBuffer as GPUBuffer,
-        0,
-        lightsArray
-      );
-    }
-    if (this.directionalLights) {
-      const lightsArray = new Float32Array(8 * this.directionalLights.length);
-      for (let i = 0; i < this.directionalLights.length; i++) {
-        lightsArray.set(
-          (this.directionalLights[i] as DirectionalLight).array,
-          i * 8
-        );
-      }
-      this.device.queue.writeBuffer(
-        this.directionalBuffer as GPUBuffer,
-        0,
-        lightsArray
-      );
-      // 光线视图投影矩阵
-      {
-        const lightPosition = vec3.fromValues(
-          lightsArray[0],
-          lightsArray[1],
-          lightsArray[2]
-        );
-        const lightViewMatrix = mat4.identity();
-        mat4.lookAt(
-          lightPosition,
-          vec3.fromValues(0, 0, 0),
-          vec3.fromValues(0, 1, 0),
-          lightViewMatrix
-        );
-        const lightProjectionMatrix = mat4.identity();
-        mat4.ortho(-40, 40, -40, 40, -50, 200, lightProjectionMatrix);
-        mat4.multiply(
-          lightProjectionMatrix,
-          lightViewMatrix,
-          lightProjectionMatrix
-        );
-        this.device.queue.writeBuffer(
-          this.lightViewProjectionBuffer,
-          0,
-          lightProjectionMatrix as Float32Array
-        );
-      }
-    }
+    this.setLightBuffer(this.lights);
   }
 
   render(camera: Camera) {
@@ -477,7 +238,6 @@ export class Scene {
     }
     const modelMatrixArray = new Float32Array(4 * 4 * this.objects.length);
     const normalMatrixArray = new Float32Array(4 * 4 * this.objects.length);
-
     this.objects.forEach((object, index) => {
       modelMatrixArray.set(object.modelMatrix, index * 4 * 4);
       let normalMatrix = mat4.copy(object.modelMatrix);
@@ -485,9 +245,7 @@ export class Scene {
       normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
       normalMatrixArray.set(normalMatrix, index * 4 * 4);
     });
-
     this.updateLightBuffer();
-
     this.device.queue.writeBuffer(
       this.uniformBuffer,
       0,
@@ -498,99 +256,54 @@ export class Scene {
       4 * 4 * 4,
       camera.viewMatrix as Float32Array
     );
-
-    this.device.queue.writeBuffer(this.modelMatrix, 0, modelMatrixArray);
-    this.device.queue.writeBuffer(this.normalMatrix, 0, normalMatrixArray);
-
+    this.device.queue.writeBuffer(this.modelMatrixBuffer, 0, modelMatrixArray);
+    this.device.queue.writeBuffer(
+      this.normalMatrixBuffer,
+      0,
+      normalMatrixArray
+    );
     //
-
     const commandEncoder = this.device.createCommandEncoder();
 
     // 阴影渲染
-    const shadowPass = commandEncoder.beginRenderPass({
-      colorAttachments: [],
-      depthStencilAttachment: {
-        view: this.shadowDepthView,
-        depthClearValue: 1.0,
-        depthLoadOp: "clear",
-        depthStoreOp: "store",
-      },
-    });
-
+    const shadowPass = commandEncoder.beginRenderPass(
+      CreateShadowRenderPassDescriptor(this.shadowTexture)
+    );
     shadowPass.setPipeline(this.shadowPipeline);
     shadowPass.setBindGroup(0, this.shadowBindGroup);
-
     this.objects.forEach((object, index) => {
-      if (object.castShadow) {
-        if (object instanceof Box) {
-          // set box vertex
-          shadowPass.setVertexBuffer(0, this.boxBuffer.vertex);
-          shadowPass.setIndexBuffer(this.boxBuffer.index, "uint16");
-          shadowPass.drawIndexed(Box.index.length, 1, 0, 0, index);
-        }
-        if (object instanceof Sphere) {
-          // set sphere vertex
-          shadowPass.setVertexBuffer(0, this.sphereBuffer.vertex);
-          shadowPass.setIndexBuffer(this.sphereBuffer.index, "uint16");
-          shadowPass.drawIndexed(Sphere.index.length, 1, 0, 0, index);
-        }
+      if (object.castShadow && object instanceof RenderableObject) {
+        object.render(shadowPass, index);
       }
     });
-
     shadowPass.end();
 
     // 主渲染
-    const renderPassDescriptor = {
-      colorAttachments: [
-        {
-          view:
-            this.sampleCount > 1
-              ? this.texture.createView()
-              : this.context.getCurrentTexture().createView(),
-          resolveTarget:
-            this.sampleCount > 1
-              ? this.context.getCurrentTexture().createView()
-              : undefined,
-          clearValue: { r: 0, g: 0, b: 0, a: 1.0 },
-          loadOp: "clear",
-          storeOp: "store",
-        },
-      ],
-      depthStencilAttachment: {
-        view: this.renderDepthTexture.createView(),
-        depthClearValue: 1.0,
-        depthLoadOp: "clear",
-        depthStoreOp: "store",
-      },
-    } as GPURenderPassDescriptor;
-
+    const renderPassDescriptor = CreateRenderPassDescriptor(
+      this.texture,
+      this.renderDepthTexture
+    );
     const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
-
     renderPass.setPipeline(this.pipeline);
-    renderPass.setBindGroup(0, this.uniformBindGroup);
+    renderPass.setBindGroup(0, this.vsBindGroup);
     renderPass.setBindGroup(1, this.lightBindGroup!);
-
     this.objects.forEach((object, index) => {
-      if (object instanceof Box) {
-        // set box vertex
-        renderPass.setVertexBuffer(0, this.boxBuffer.vertex);
-        renderPass.setIndexBuffer(this.boxBuffer.index, "uint16");
-        renderPass.drawIndexed(Box.index.length, 1, 0, 0, index);
-      }
-      if (object instanceof Sphere) {
-        // set sphere vertex
-        renderPass.setVertexBuffer(0, this.sphereBuffer.vertex);
-        renderPass.setIndexBuffer(this.sphereBuffer.index, "uint16");
-        renderPass.drawIndexed(Sphere.index.length, 1, 0, 0, index);
+      if (object instanceof RenderableObject) {
+        object.render(renderPass, index);
       }
     });
 
+    // 其他附件
     this.helperObjects.forEach((object) => {
       (object as Axes).render(renderPass, camera);
     });
+    this.objects.forEach((object) => {
+      if (object instanceof RenderableObject && object.wireframe) {
+        object.renderWireframe(renderPass, camera);
+      }
+    });
 
     renderPass.end();
-
     this.device.queue.submit([commandEncoder.finish()]);
     if (this.stats) {
       this.stats.end();
@@ -606,23 +319,15 @@ export class Scene {
 
   public resize(camera: Camera) {
     const gpuManager = GPUManager.getInstance();
-    let canvas = gpuManager.canvas as HTMLCanvasElement;
+    const canvas = gpuManager.canvas as HTMLCanvasElement;
     canvas.width = window.innerWidth * window.devicePixelRatio;
     canvas.height = window.innerHeight * window.devicePixelRatio;
+    const size = [canvas.width, canvas.height, 1];
     this.texture.destroy();
-    this.texture = this.device.createTexture({
-      size: [canvas.width, canvas.height],
-      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
-      format: this.format,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    this.texture = CreateTexture(size);
+    // 深度贴图
     this.renderDepthTexture.destroy();
-    this.renderDepthTexture = this.device.createTexture({
-      size: [canvas.width, canvas.height],
-      sampleCount: this.sampleCount > 1 ? this.sampleCount : undefined,
-      format: "depth32float",
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    this.renderDepthTexture = CreateDepthTexture(size);
     camera.aspect = canvas.width / canvas.height;
   }
 }

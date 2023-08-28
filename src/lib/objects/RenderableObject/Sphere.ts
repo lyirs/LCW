@@ -105,15 +105,26 @@ const createSphere = (
 
 export class Sphere extends RenderableObject {
   public vertexCount: number;
-  private vertices: Float32Array;
-  private indices: Uint16Array;
-  public static vertex = createSphere(1, 32, 16, 0).vertices;
-  public static index = createSphere(1, 32, 16, 0).indices;
 
-  constructor() {
+  constructor(
+    radius = 1,
+    widthSegments = 32,
+    heightSegments = 16,
+    randomness = 0
+  ) {
     super();
-    this.vertices = createSphere(1, 32, 16, 0).vertices;
-    this.indices = createSphere(1, 32, 16, 0).indices;
+    const sphere = createSphere(
+      radius,
+      widthSegments,
+      heightSegments,
+      randomness
+    );
+    this.vertices = sphere.vertices;
+    this.indices = sphere.indices;
     this.vertexCount = this.indices.length;
+    this.renderBuffer = {
+      vertex: CreateGPUBufferF32(this.vertices),
+      index: CreateGPUBufferUint16(this.indices),
+    };
   }
 }

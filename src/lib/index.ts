@@ -1,5 +1,6 @@
 export { Axes } from "./objects/HelperObjects/Axes";
 export { Box } from "./objects/RenderableObject/Box";
+export { Cube } from "./objects/RenderableObject/Box";
 export { Sphere } from "./objects/RenderableObject/Sphere";
 export { Vector3 } from "./math/Vector3";
 export { Camera } from "./core/Camera";

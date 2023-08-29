@@ -2,7 +2,7 @@ import { mat4, vec3 } from "wgpu-matrix";
 import {
   CreateGPUBufferF32,
   CreateGPUBufferUint16,
-} from "../../helper/gpuBuffer";
+} from "../../auxiliary/gpuBuffer";
 import { RenderableObject } from "./RenderableBase";
 
 const createSphere = (

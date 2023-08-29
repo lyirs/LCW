@@ -2,7 +2,8 @@ import { RenderableObject } from "./RenderableBase";
 import {
   CreateGPUBufferF32,
   CreateGPUBufferUint16,
-} from "../../helper/gpuBuffer";
+} from "../../auxiliary/gpuBuffer";
+import { GPUManager } from "../../core/GPUManager";
 
 // TODO： tangents
 // prettier-ignore
@@ -74,6 +75,29 @@ export class Box extends RenderableObject {
       vertex: CreateGPUBufferF32(this.vertices),
       index: CreateGPUBufferUint16(this.indices),
     };
+    this.wireframeIndices = boxWireframeIndexArray;
+  }
+}
+
+export class Cube extends RenderableObject {
+  private static sharedVertexBuffer: GPUBuffer | null = null;
+  private static sharedIndexBuffer: GPUBuffer | null = null;
+  public static vertexCount: number = 36;
+  public static renderBuffer: { vertex: GPUBuffer; index: GPUBuffer };
+  constructor() {
+    super();
+    this.vertices = boxVertexArray(1, 1, 1);
+    this.indices = boxIndexArray;
+
+    if (!Cube.sharedVertexBuffer || !Cube.sharedIndexBuffer) {
+      Cube.sharedVertexBuffer = CreateGPUBufferF32(boxVertexArray(1, 1, 1));
+      Cube.sharedIndexBuffer = CreateGPUBufferUint16(boxIndexArray);
+    }
+    this.renderBuffer = {
+      vertex: Cube.sharedVertexBuffer,
+      index: Cube.sharedIndexBuffer,
+    };
+    Cube.renderBuffer = this.renderBuffer;
     this.wireframeIndices = boxWireframeIndexArray;
   }
 }

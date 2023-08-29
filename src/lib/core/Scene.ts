@@ -4,22 +4,25 @@ import {
   CreateBindGroupWithLayout,
   CreateFragmentBindGroupLayout,
   CreateVertexBindGroupLayout,
-} from "../helper/bindGroup";
-import { CreateStorageBuffer, CreateUniformBuffer } from "../helper/gpuBuffer";
+} from "../auxiliary/bindGroup";
+import {
+  CreateStorageBuffer,
+  CreateUniformBuffer,
+} from "../auxiliary/gpuBuffer";
 import {
   getLightViewProjectionMatrix,
   Light,
   lightBindGroupEntries,
   LightConfigs,
   LightType,
-} from "../helper/light";
+} from "../auxiliary/light";
 import {
   CreateRenderPassDescriptor,
   CreateRenderPipeLineWithLayout,
   CreateShadowRenderPassDescriptor,
   CreateShadowRenderPipeLineWithLayout,
   setPipelineVertexBuffer,
-} from "../helper/renderProgram";
+} from "../auxiliary/renderProgram";
 import { GeometryBase } from "../objects/GeometryBase";
 import { Camera } from "./Camera";
 import { GPUManager } from "./GPUManager";
@@ -30,24 +33,25 @@ import {
   CreateDepthTexture,
   CreateShadowTexture,
   CreateTexture,
-} from "../texture/texture";
+} from "../auxiliary/texture";
 import { DirectionalLight } from "../light/DirectionalLight";
 import { AmbientLight } from "../light/AmbientLight";
 import { PointLight } from "../light/PointLight";
 import { Vector3 } from "../math/Vector3";
-import {
-  Renderable,
-  RenderableObject,
-} from "../objects/RenderableObject/RenderableBase";
+import { Renderable } from "../objects/RenderableObject/RenderableBase";
+import { Cube } from "../objects/RenderableObject/Box";
+import { CreateRenderBundle } from "../auxiliary/renderBundle";
 
 export class Scene {
   private stats: Stats | undefined; // 性能数据显示
   private device: GPUDevice;
+  private format: GPUTextureFormat;
+  private sampleCount: number;
   //
   private texture: GPUTexture; // 贴图
   private renderDepthTexture: GPUTexture; // 深度贴图
   // 场景物体
-  public objects: GeometryBase[] = []; // 场景物体
+  public objects: Map<string, Renderable[]> = new Map();
   public helperObjects: GeometryBase[] = []; // 场景辅助物体
   private uniformBuffer: GPUBuffer; // vp buffer
   private modelMatrixBuffer: GPUBuffer; // 场景模型buffer
@@ -69,10 +73,14 @@ export class Scene {
   // 渲染管线
   private pipeline: GPURenderPipeline;
   private shadowPipeline: GPURenderPipeline;
+  // 命令束
+  private renderBundle: GPURenderBundle | undefined;
 
   constructor() {
     const gpuManager = GPUManager.getInstance();
     this.device = gpuManager.device as GPUDevice;
+    this.format = gpuManager.format as GPUTextureFormat;
+    this.sampleCount = gpuManager.sampleCount as number;
     const canvas = gpuManager.canvas as HTMLCanvasElement;
     // const size = {
     //   width: canvas.width,
@@ -158,16 +166,34 @@ export class Scene {
   public addObject(object: Renderable | Axes) {
     if (!this.helperObjects.includes(object) && object instanceof Axes) {
       this.helperObjects.push(object);
-      return;
+    } else if (!(object instanceof Axes)) {
+      const objectType = object.constructor.name;
+      if (!this.objects.has(objectType)) {
+        this.objects.set(objectType, []);
+      }
+      const objectsOfType = this.objects.get(objectType);
+      if (objectsOfType && !objectsOfType.includes(object)) {
+        objectsOfType.push(object);
+      }
     }
-    if (!this.objects.includes(object)) {
-      this.objects.push(object);
+  }
+
+  public getTotalRenderableCount(): number {
+    let count = 0;
+    for (const [type, objects] of this.objects.entries()) {
+      count += objects.length;
+    }
+    return count;
+  }
+
+  public prepareResources() {
+    if (this.getTotalRenderableCount() > 0) {
       // 全局矩阵
       this.modelMatrixBuffer = CreateStorageBuffer(
-        4 * 4 * 4 * this.objects.length
+        4 * 4 * 4 * this.getTotalRenderableCount()
       );
       this.normalMatrixBuffer = CreateStorageBuffer(
-        4 * 4 * 4 * this.objects.length
+        4 * 4 * 4 * this.getTotalRenderableCount()
       );
       this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
         { binding: 0, resource: this.uniformBuffer },
@@ -182,6 +208,7 @@ export class Scene {
         { binding: 3, resource: this.normalMatrixBuffer },
       ]);
     }
+    this.setLightBuffer(this.lights);
   }
 
   public addLight(light: Light) {
@@ -191,22 +218,31 @@ export class Scene {
       this.lights.set(light.type, lightsOfType);
     }
     lightsOfType.push(light);
-    this.setLightBuffer(this.lights);
   }
 
-  private handleLightBuffer(lightType: LightType, lights: Light[]): void {
+  private handleLightBuffer(
+    lightType: LightType,
+    lights: Light[],
+    isUpdate = false
+  ): void {
     // TODO 多光源阴影
     const config = LightConfigs[lightType];
     if (!lights || !lights.length) return;
-
-    config.buffer = CreateUniformBuffer(lights.length * config.size * 4);
-    this.lightBindGroupEntries[lightType].resource.buffer = config.buffer;
     const lightsArray = new Float32Array(config.size * lights.length);
     for (let i = 0; i < lights.length; i++) {
       lightsArray.set(lights[i].array, i * config.size);
     }
-    this.device.queue.writeBuffer(config.buffer, 0, lightsArray);
-
+    if (isUpdate) {
+      this.device.queue.writeBuffer(
+        this.lightBindGroupEntries[lightType].resource.buffer,
+        0,
+        lightsArray
+      );
+    } else {
+      config.buffer = CreateUniformBuffer(lights.length * config.size * 4);
+      this.lightBindGroupEntries[lightType].resource.buffer = config.buffer;
+      this.device.queue.writeBuffer(config.buffer, 0, lightsArray);
+    }
     if (lightType === LightType.DIRECTIONAL) {
       // 光线视图投影矩阵的更新
       this.device.queue.writeBuffer(
@@ -229,22 +265,72 @@ export class Scene {
   }
 
   private updateLightBuffer() {
-    this.setLightBuffer(this.lights);
+    for (const lightType of Object.values(LightType) as LightType[]) {
+      this.handleLightBuffer(
+        lightType,
+        this.lights.get(lightType) as Light[],
+        true
+      );
+    }
+  }
+
+  private createRenderBundle() {
+    this.renderBundle = CreateRenderBundle((encoder) =>
+      this.renderScene(encoder)
+    );
+  }
+
+  private renderScene(
+    renderPass: GPURenderPassEncoder | GPURenderBundleEncoder
+  ) {
+    renderPass.setPipeline(this.pipeline);
+    renderPass.setBindGroup(0, this.vsBindGroup);
+    renderPass.setBindGroup(1, this.lightBindGroup!);
+    let globalIndex = 0;
+    for (const [type, objectsOfType] of this.objects.entries()) {
+      if (type == "Cube") {
+        renderPass.setVertexBuffer(0, Cube.renderBuffer.vertex);
+        renderPass.setIndexBuffer(Cube.renderBuffer.index, "uint16");
+        renderPass.drawIndexed(
+          Cube.vertexCount,
+          objectsOfType.length,
+          0,
+          0,
+          globalIndex
+        );
+        globalIndex += objectsOfType.length;
+        continue;
+      }
+      for (const object of objectsOfType) {
+        object.render(renderPass, globalIndex);
+        globalIndex++;
+      }
+    }
   }
 
   render(camera: Camera) {
     if (this.stats) {
       this.stats.begin();
     }
-    const modelMatrixArray = new Float32Array(4 * 4 * this.objects.length);
-    const normalMatrixArray = new Float32Array(4 * 4 * this.objects.length);
-    this.objects.forEach((object, index) => {
-      modelMatrixArray.set(object.modelMatrix, index * 4 * 4);
-      let normalMatrix = mat4.copy(object.modelMatrix);
-      normalMatrix = mat4.invert(normalMatrix);
-      normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
-      normalMatrixArray.set(normalMatrix, index * 4 * 4);
-    });
+    const modelMatrixArray = new Float32Array(
+      4 * 4 * this.getTotalRenderableCount()
+    );
+    const normalMatrixArray = new Float32Array(
+      4 * 4 * this.getTotalRenderableCount()
+    );
+
+    let globalIndex = 0; // 用于跟踪全局索引
+    for (const objectsOfType of this.objects.values()) {
+      for (const object of objectsOfType) {
+        modelMatrixArray.set(object.modelMatrix, globalIndex * 4 * 4);
+        let normalMatrix = mat4.copy(object.modelMatrix);
+        normalMatrix = mat4.invert(normalMatrix);
+        normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
+        normalMatrixArray.set(normalMatrix, globalIndex * 4 * 4);
+        globalIndex++;
+      }
+    }
+
     this.updateLightBuffer();
     this.device.queue.writeBuffer(
       this.uniformBuffer,
@@ -271,11 +357,16 @@ export class Scene {
     );
     shadowPass.setPipeline(this.shadowPipeline);
     shadowPass.setBindGroup(0, this.shadowBindGroup);
-    this.objects.forEach((object, index) => {
-      if (object.castShadow && object instanceof RenderableObject) {
-        object.render(shadowPass, index);
+
+    globalIndex = 0;
+    for (const [type, objectsOfType] of this.objects.entries()) {
+      for (const object of objectsOfType) {
+        if (object.castShadow) {
+          object.render(shadowPass, globalIndex);
+          globalIndex++;
+        }
       }
-    });
+    }
     shadowPass.end();
 
     // 主渲染
@@ -284,24 +375,28 @@ export class Scene {
       this.renderDepthTexture
     );
     const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.setPipeline(this.pipeline);
-    renderPass.setBindGroup(0, this.vsBindGroup);
-    renderPass.setBindGroup(1, this.lightBindGroup!);
-    this.objects.forEach((object, index) => {
-      if (object instanceof RenderableObject) {
-        object.render(renderPass, index);
-      }
-    });
+
+    if (this.renderBundle) {
+      renderPass.executeBundles([this.renderBundle]);
+    } else {
+      this.createRenderBundle();
+      renderPass.executeBundles([this.renderBundle!]);
+    }
 
     // 其他附件
     this.helperObjects.forEach((object) => {
       (object as Axes).render(renderPass, camera);
     });
-    this.objects.forEach((object) => {
-      if (object instanceof RenderableObject && object.wireframe) {
-        object.renderWireframe(renderPass, camera);
+
+    globalIndex = 0;
+    for (const [type, objectsOfType] of this.objects.entries()) {
+      for (const object of objectsOfType) {
+        if (object.wireframe) {
+          object.renderWireframe(renderPass, camera);
+          globalIndex++;
+        }
       }
-    });
+    }
 
     renderPass.end();
     this.device.queue.submit([commandEncoder.finish()]);

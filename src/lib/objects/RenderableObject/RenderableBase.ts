@@ -5,14 +5,14 @@ import {
   CreateGPUBufferF32,
   CreateGPUBufferUint16,
   CreateUniformBuffer,
-} from "../../helper/gpuBuffer";
+} from "../../auxiliary/gpuBuffer";
 import vertWGSL from "./shader/wireframe.vert.wgsl?raw";
 import fragWGSL from "./shader/wireframe.frag.wgsl?raw";
 import { GeometryBase } from "../GeometryBase";
-import { Box } from "./Box";
+import { Box, Cube } from "./Box";
 import { Sphere } from "./Sphere";
 
-export type Renderable = Box | Sphere;
+export type Renderable = Cube | Box | Sphere;
 
 export class RenderableObject extends GeometryBase {
   protected _modelMatrix: Mat4 = mat4.identity(); // 模型矩阵
@@ -137,19 +137,28 @@ export class RenderableObject extends GeometryBase {
     }
   }
 
-  public render = (renderPass: GPURenderPassEncoder, index: number) => {
+  public render = (
+    renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
+    index: number
+  ) => {
     renderPass.setVertexBuffer(0, this.renderBuffer.vertex);
     renderPass.setIndexBuffer(this.renderBuffer.index, "uint16");
     renderPass.drawIndexed(this.indices.length, 1, 0, 0, index);
   };
 
-  public renderShadow = (shadowPass: GPURenderPassEncoder, index: number) => {
+  public renderShadow = (
+    shadowPass: GPURenderPassEncoder | GPURenderBundleEncoder,
+    index: number
+  ) => {
     shadowPass.setVertexBuffer(0, this.renderBuffer.vertex);
     shadowPass.setIndexBuffer(this.renderBuffer.index, "uint16");
     shadowPass.drawIndexed(this.indices.length, 1, 0, 0, index);
   };
 
-  public renderWireframe(renderPass: GPURenderPassEncoder, camera: Camera) {
+  public renderWireframe(
+    renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
+    camera: Camera
+  ) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
     const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;
     this.device.queue.writeBuffer(this.uniformBuffer, 0, mvpMatrix);

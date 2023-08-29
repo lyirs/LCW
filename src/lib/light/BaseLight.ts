@@ -1,4 +1,4 @@
-import { LightType } from "../helper/light";
+import { LightType } from "../auxiliary/light";
 import { Color } from "../math/Color";
 
 export class BaseLight {

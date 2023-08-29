@@ -50,11 +50,28 @@ scene.addObject(axes);
 scene.addObject(plane);
 scene.addLight(ambientLight);
 scene.addLight(directionalLight);
-// scene.addLight(pointLight);
+scene.addLight(pointLight);
+
+// const now = performance.now();
+// for (let i = 0; i < 100000; i++) {
+//   const box = new LCW.Cube();
+//   box.setPosition(
+//     new LCW.Vector3(
+//       (Math.random() - 0.5) * 10,
+//       (Math.random() - 0.5) * 10,
+//       (Math.random() - 0.5) * 10
+//     )
+//   );
+//   box.setScale(new LCW.Vector3(0.1));
+//   scene.addObject(box);
+// }
+// const now2 = performance.now();
+// console.log(now2 - now);
 
 scene.setStats();
 
 // 渲染
+scene.prepareResources();
 const render = () => {
   const now = performance.now();
   directionalLight.setPosition(

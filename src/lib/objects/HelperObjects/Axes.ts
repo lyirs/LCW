@@ -3,7 +3,7 @@ import fragWGSL from "./shader/axes.frag.wgsl?raw";
 import {
   CreateGPUBufferF32,
   CreateUniformBuffer,
-} from "../../helper/gpuBuffer";
+} from "../../auxiliary/gpuBuffer";
 import { Camera } from "../../core/Camera";
 import { Mat4, mat4, vec3 } from "wgpu-matrix";
 import { GPUManager } from "../../core/GPUManager";
@@ -113,7 +113,10 @@ export class Axes extends GeometryBase {
     this.vertexCount = 6;
   }
 
-  public render(renderPass: GPURenderPassEncoder, camera: Camera) {
+  public render(
+    renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
+    camera: Camera
+  ) {
     const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
 
     const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;

@@ -1,4 +1,4 @@
-import { LightType } from "../helper/light";
+import { LightType } from "../auxiliary/light";
 import { Color } from "../math/Color";
 import { Vector3 } from "../math/Vector3";
 import { BaseLight } from "./BaseLight";

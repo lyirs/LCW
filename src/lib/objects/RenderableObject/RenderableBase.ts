@@ -16,9 +16,9 @@ export type Renderable = Cube | Box | Sphere;
 
 export class RenderableObject extends GeometryBase {
   protected _modelMatrix: Mat4 = mat4.identity(); // 模型矩阵
-  protected vertices: Float32Array = new Float32Array();
-  protected indices: Uint16Array = new Uint16Array();
-  protected renderBuffer: { vertex: GPUBuffer; index: GPUBuffer };
+  protected vertices: Float32Array | undefined;
+  protected indices: Uint16Array | undefined;
+  protected renderBuffer: { vertex: GPUBuffer; index: GPUBuffer } | undefined;
   protected vertexBuffer: GPUBuffer | undefined;
   protected _wireframe: boolean = false;
   protected wireframeIndexBuffer: GPUBuffer | undefined;
@@ -32,10 +32,6 @@ export class RenderableObject extends GeometryBase {
     const gpuManager = GPUManager.getInstance();
     const device = gpuManager.device as GPUDevice;
     this.device = device;
-    this.renderBuffer = {
-      vertex: CreateGPUBufferF32(this.vertices),
-      index: CreateGPUBufferUint16(this.indices),
-    };
   }
 
   public get modelMatrix(): Mat4 {
@@ -54,7 +50,7 @@ export class RenderableObject extends GeometryBase {
       const format = gpuManager.format as GPUTextureFormat;
 
       this.wireframeVertexCount = this.wireframeIndices!.length;
-      this.vertexBuffer = CreateGPUBufferF32(this.vertices);
+      this.vertexBuffer = CreateGPUBufferF32(this.vertices!);
       this.wireframeIndexBuffer = CreateGPUBufferUint16(this.wireframeIndices!);
 
       this.wireframePipeline = device.createRenderPipeline({
@@ -141,18 +137,18 @@ export class RenderableObject extends GeometryBase {
     renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
     index: number
   ) => {
-    renderPass.setVertexBuffer(0, this.renderBuffer.vertex);
-    renderPass.setIndexBuffer(this.renderBuffer.index, "uint16");
-    renderPass.drawIndexed(this.indices.length, 1, 0, 0, index);
+    renderPass.setVertexBuffer(0, this.renderBuffer!.vertex);
+    renderPass.setIndexBuffer(this.renderBuffer!.index, "uint16");
+    renderPass.drawIndexed(this.indices!.length, 1, 0, 0, index);
   };
 
   public renderShadow = (
     shadowPass: GPURenderPassEncoder | GPURenderBundleEncoder,
     index: number
   ) => {
-    shadowPass.setVertexBuffer(0, this.renderBuffer.vertex);
-    shadowPass.setIndexBuffer(this.renderBuffer.index, "uint16");
-    shadowPass.drawIndexed(this.indices.length, 1, 0, 0, index);
+    shadowPass.setVertexBuffer(0, this.renderBuffer!.vertex);
+    shadowPass.setIndexBuffer(this.renderBuffer!.index, "uint16");
+    shadowPass.drawIndexed(this.indices!.length, 1, 0, 0, index);
   };
 
   public renderWireframe(

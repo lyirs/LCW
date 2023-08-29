@@ -2,10 +2,11 @@ import { GPUManager } from "../core/GPUManager";
 import { Cube } from "../objects/RenderableObject/Box";
 import { Renderable } from "../objects/RenderableObject/RenderableBase";
 
-type RenderCallback = (encoder: GPURenderBundleEncoder) => void;
-
 export const CreateRenderBundle = (
-  renderCallback: RenderCallback,
+  pipeline: GPURenderPipeline,
+  vsBindGroup: GPUBindGroup,
+  lightBindGroup: GPUBindGroup,
+  objects: RenderableObjectsMap
 ): GPURenderBundle => {
   const gpuManager = GPUManager.getInstance();
   const device = gpuManager.device as GPUDevice;
@@ -17,7 +18,13 @@ export const CreateRenderBundle = (
     sampleCount: sampleCount,
   });
 
-  renderCallback(renderBundleEncoder);
+  renderSceneGeneric(
+    renderBundleEncoder,
+    pipeline,
+    vsBindGroup,
+    lightBindGroup,
+    objects
+  );
 
   return renderBundleEncoder.finish();
 };

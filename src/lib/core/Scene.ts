@@ -275,37 +275,12 @@ export class Scene {
   }
 
   private createRenderBundle() {
-    this.renderBundle = CreateRenderBundle((encoder) =>
-      this.renderScene(encoder)
+    this.renderBundle = CreateRenderBundle(
+      this.pipeline,
+      this.vsBindGroup,
+      this.lightBindGroup!,
+      this.objects
     );
-  }
-
-  private renderScene(
-    renderPass: GPURenderPassEncoder | GPURenderBundleEncoder
-  ) {
-    renderPass.setPipeline(this.pipeline);
-    renderPass.setBindGroup(0, this.vsBindGroup);
-    renderPass.setBindGroup(1, this.lightBindGroup!);
-    let globalIndex = 0;
-    for (const [type, objectsOfType] of this.objects.entries()) {
-      if (type == "Cube") {
-        renderPass.setVertexBuffer(0, Cube.renderBuffer.vertex);
-        renderPass.setIndexBuffer(Cube.renderBuffer.index, "uint16");
-        renderPass.drawIndexed(
-          Cube.vertexCount,
-          objectsOfType.length,
-          0,
-          0,
-          globalIndex
-        );
-        globalIndex += objectsOfType.length;
-        continue;
-      }
-      for (const object of objectsOfType) {
-        object.render(renderPass, globalIndex);
-        globalIndex++;
-      }
-    }
   }
 
   render(camera: Camera) {
@@ -363,8 +338,8 @@ export class Scene {
       for (const object of objectsOfType) {
         if (object.castShadow) {
           object.render(shadowPass, globalIndex);
-          globalIndex++;
         }
+        globalIndex++;
       }
     }
     shadowPass.end();

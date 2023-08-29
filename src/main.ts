@@ -52,6 +52,8 @@ scene.addLight(ambientLight);
 scene.addLight(directionalLight);
 scene.addLight(pointLight);
 
+// 10w物体 1100ms （RTX 3060)
+// 100w物体 60000ms （RTX 3060)
 // const now = performance.now();
 // for (let i = 0; i < 100000; i++) {
 //   const box = new LCW.Cube();

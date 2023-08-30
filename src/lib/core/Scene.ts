@@ -39,14 +39,11 @@ import { AmbientLight } from "../light/AmbientLight";
 import { PointLight } from "../light/PointLight";
 import { Vector3 } from "../math/Vector3";
 import { Renderable } from "../objects/RenderableObject/RenderableBase";
-import { Cube } from "../objects/RenderableObject/Box";
 import { CreateRenderBundle } from "../auxiliary/renderBundle";
 
 export class Scene {
   private stats: Stats | undefined; // 性能数据显示
   private device: GPUDevice;
-  private format: GPUTextureFormat;
-  private sampleCount: number;
   //
   private texture: GPUTexture; // 贴图
   private renderDepthTexture: GPUTexture; // 深度贴图
@@ -54,10 +51,10 @@ export class Scene {
   public objects: Map<string, Renderable[]> = new Map();
   public helperObjects: GeometryBase[] = []; // 场景辅助物体
   private uniformBuffer: GPUBuffer; // vp buffer
-  private modelMatrixBuffer: GPUBuffer; // 场景模型buffer
-  private normalMatrixBuffer: GPUBuffer; // 场景法线buffer
+  private modelMatrixBuffer: GPUBuffer | undefined; // 场景模型buffer
+  private normalMatrixBuffer: GPUBuffer | undefined; // 场景法线buffer
   private vsBindGroupLayout: GPUBindGroupLayout;
-  private vsBindGroup: GPUBindGroup;
+  private vsBindGroup: GPUBindGroup | undefined;
   // 光源
   public lights: Map<LightType, Light[]> = new Map(); // 光线
   public ambientLights: AmbientLight[] | undefined;
@@ -69,7 +66,7 @@ export class Scene {
   // 阴影
   private lightViewProjectionBuffer: GPUBuffer; // 直射光vp buffer
   private shadowTexture: GPUTexture;
-  private shadowBindGroup: GPUBindGroup;
+  private shadowBindGroup: GPUBindGroup | undefined;
   // 渲染管线
   private pipeline: GPURenderPipeline;
   private shadowPipeline: GPURenderPipeline;
@@ -79,8 +76,6 @@ export class Scene {
   constructor() {
     const gpuManager = GPUManager.getInstance();
     this.device = gpuManager.device as GPUDevice;
-    this.format = gpuManager.format as GPUTextureFormat;
-    this.sampleCount = gpuManager.sampleCount as number;
     const canvas = gpuManager.canvas as HTMLCanvasElement;
     // const size = {
     //   width: canvas.width,
@@ -136,9 +131,21 @@ export class Scene {
     // uniform buffer
     this.uniformBuffer = CreateUniformBuffer(4 * 4 * 4 * 2); // 4*4*4 viewMatrix ; 4*4*4 projectionMatrix
 
+    // 全局更新
+    this.updateGlobalBindGroup();
+
+    // bindgroup @group(1)
+    this.lightBindGroupEntries = lightBindGroupEntries(this.shadowTexture);
+    this.lightBindGroup = this.device.createBindGroup({
+      layout: this.lightBindGroupLayout!,
+      entries: this.lightBindGroupEntries,
+    });
+  }
+
+  public updateGlobalBindGroup(count: number = 1) {
     // 全局矩阵
-    this.modelMatrixBuffer = CreateStorageBuffer(4 * 4 * 4);
-    this.normalMatrixBuffer = CreateStorageBuffer(4 * 4 * 4);
+    this.modelMatrixBuffer = CreateStorageBuffer(4 * 4 * 4 * count);
+    this.normalMatrixBuffer = CreateStorageBuffer(4 * 4 * 4 * count);
 
     // bindgroup @group(0)
     this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
@@ -154,13 +161,6 @@ export class Scene {
       { binding: 2, resource: this.modelMatrixBuffer },
       { binding: 3, resource: this.normalMatrixBuffer },
     ]);
-
-    // bindgroup @group(1)
-    this.lightBindGroupEntries = lightBindGroupEntries(this.shadowTexture);
-    this.lightBindGroup = this.device.createBindGroup({
-      layout: this.lightBindGroupLayout!,
-      entries: this.lightBindGroupEntries,
-    });
   }
 
   public addObject(object: Renderable | Axes) {
@@ -189,24 +189,7 @@ export class Scene {
   public prepareResources() {
     if (this.getTotalRenderableCount() > 0) {
       // 全局矩阵
-      this.modelMatrixBuffer = CreateStorageBuffer(
-        4 * 4 * 4 * this.getTotalRenderableCount()
-      );
-      this.normalMatrixBuffer = CreateStorageBuffer(
-        4 * 4 * 4 * this.getTotalRenderableCount()
-      );
-      this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
-        { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightViewProjectionBuffer },
-        { binding: 2, resource: this.modelMatrixBuffer },
-        { binding: 3, resource: this.normalMatrixBuffer },
-      ]);
-      this.shadowBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
-        { binding: 0, resource: this.uniformBuffer },
-        { binding: 1, resource: this.lightViewProjectionBuffer },
-        { binding: 2, resource: this.modelMatrixBuffer },
-        { binding: 3, resource: this.normalMatrixBuffer },
-      ]);
+      this.updateGlobalBindGroup(this.getTotalRenderableCount());
     }
     this.setLightBuffer(this.lights);
   }
@@ -277,7 +260,7 @@ export class Scene {
   private createRenderBundle() {
     this.renderBundle = CreateRenderBundle(
       this.pipeline,
-      this.vsBindGroup,
+      this.vsBindGroup!,
       this.lightBindGroup!,
       this.objects
     );
@@ -317,9 +300,9 @@ export class Scene {
       4 * 4 * 4,
       camera.viewMatrix as Float32Array
     );
-    this.device.queue.writeBuffer(this.modelMatrixBuffer, 0, modelMatrixArray);
+    this.device.queue.writeBuffer(this.modelMatrixBuffer!, 0, modelMatrixArray);
     this.device.queue.writeBuffer(
-      this.normalMatrixBuffer,
+      this.normalMatrixBuffer!,
       0,
       normalMatrixArray
     );
@@ -331,7 +314,7 @@ export class Scene {
       CreateShadowRenderPassDescriptor(this.shadowTexture)
     );
     shadowPass.setPipeline(this.shadowPipeline);
-    shadowPass.setBindGroup(0, this.shadowBindGroup);
+    shadowPass.setBindGroup(0, this.shadowBindGroup!);
 
     globalIndex = 0;
     for (const [type, objectsOfType] of this.objects.entries()) {

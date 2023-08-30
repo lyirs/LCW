@@ -6,6 +6,8 @@ struct Uniforms {
 @group(0) @binding(1) var<uniform> lightViewProjection : mat4x4<f32>;
 @group(0) @binding(2) var<storage> modelMatrices : array<mat4x4<f32>>;
 @group(0) @binding(3) var<storage> normalMatrices : array<mat4x4<f32>>;
+@group(0) @binding(4) var<storage> colorArray: array<vec4<f32>>;
+@group(0) @binding(5) var<storage> receiveShadowArray :array<f32>;
 
 @vertex
 fn shadow(

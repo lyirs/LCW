@@ -3,6 +3,8 @@ export { Box } from "./objects/RenderableObject/Box";
 export { Cube } from "./objects/RenderableObject/Box";
 export { Sphere } from "./objects/RenderableObject/Sphere";
 export { Vector3 } from "./math/Vector3";
+export { Quaternion } from "./math/Quaternion";
+export { Matrix4 } from "./math/Matrix4";
 export { Camera } from "./core/Camera";
 export { CameraController } from "./components/CameraController";
 export { GPUManager } from "./core/GPUManager";

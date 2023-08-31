@@ -10,8 +10,10 @@ fn main(
     @location(1) fragNormal: vec3<f32>,
     @location(2) fragUV: vec2<f32>,
     @location(3) shadowPos: vec3<f32>,
+    @location(4) fragColor: vec4<f32>,
+    @location(5) receiveShadow: f32,
 ) -> @location(0) vec4<f32> {
-    var objectColor = vec3<f32>(1.0, 1.0, 1.0);
+    var objectColor = fragColor.rgb;
     var ambientLightColor = vec3(1.0, 1.0, 1.0);  // 环境光
     var dirLightColor = vec3(1.0, 1.0, 1.0);  // 直射光
     var pointLightColor = vec3(1.0, 1.0, 1.0);  // 点光源
@@ -58,6 +60,7 @@ fn main(
         }
     }
     shadow = shadow / 9.0;
+    shadow = mix(1.0, shadow, receiveShadow);
     lightResult += dirLightColor * directionIntensity * shadow * diffuse;
 
     // 点光源

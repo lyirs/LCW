@@ -1,5 +1,5 @@
 import Stats from "stats.js";
-import { vec3, mat4 } from "wgpu-matrix";
+import { mat4 } from "wgpu-matrix";
 import {
   CreateBindGroupWithLayout,
   CreateFragmentBindGroupLayout,
@@ -51,8 +51,9 @@ export class Scene {
   public objects: Map<string, Renderable[]> = new Map();
   public helperObjects: GeometryBase[] = []; // 场景辅助物体
   private uniformBuffer: GPUBuffer; // vp buffer
-  private modelMatrixBuffer: GPUBuffer | undefined; // 场景模型buffer
-  private normalMatrixBuffer: GPUBuffer | undefined; // 场景法线buffer
+  private modelMatrixBuffer: GPUBuffer | undefined; // 场景物体模型buffer
+  private normalMatrixBuffer: GPUBuffer | undefined; // 场景物体法线buffer
+  private colorBuffer: GPUBuffer | undefined; // 场景物体颜色buffer
   private vsBindGroupLayout: GPUBindGroupLayout;
   private vsBindGroup: GPUBindGroup | undefined;
   // 光源
@@ -65,6 +66,7 @@ export class Scene {
   private lightBindGroup: GPUBindGroup | undefined;
   // 阴影
   private lightViewProjectionBuffer: GPUBuffer; // 直射光vp buffer
+  private receiveShadowBuffer: GPUBuffer | undefined; // 场景物体承载阴影buffer
   private shadowTexture: GPUTexture;
   private shadowBindGroup: GPUBindGroup | undefined;
   // 渲染管线
@@ -89,6 +91,8 @@ export class Scene {
       "uniform", // @group(0) @binding(1) var<uniform> lightProjection : mat4x4<f32>
       "read-only-storage", // @group(0) @binding(2) var<storage> model : array<mat4x4<f32>>
       "read-only-storage", // @group(0) @binding(3) var<storage> normal : array<mat4x4<f32>>
+      "read-only-storage", // @group(0) @binding(4) var<storage> colorArray: array<vec4<f32>>
+      "read-only-storage", // @group(0) @binding(5) var<storage> receiveShadowArray :array<f32>
     ]);
     this.lightBindGroupLayout = CreateFragmentBindGroupLayout([
       "uniform", // @group(1) @binding(0) var<uniform> ambientLight : array<vec4<f32>, 2>
@@ -97,7 +101,6 @@ export class Scene {
       "depth", // @group(1) @binding(3) var shadowMap: texture_depth_2d;
       "comparison", // @group(1) @binding(4) var shadowSampler: sampler_comparison;
     ]);
-
     // 创建阴影管线
     const pipelineBuffer = setPipelineVertexBuffer(
       ["float32x3", "float32x3", "float32x2"],
@@ -109,7 +112,6 @@ export class Scene {
       vertWGSL,
       pipelineBuffer
     );
-
     // 创建渲染管线
     this.pipeline = CreateRenderPipeLineWithLayout(
       "pipeline",
@@ -118,22 +120,18 @@ export class Scene {
       fragWGSL,
       pipelineBuffer
     );
-
     // 贴图
     this.texture = CreateTexture(size);
     // 深度贴图
     this.renderDepthTexture = CreateDepthTexture(size);
     // 阴影贴图
     this.shadowTexture = CreateShadowTexture(2048, 2048);
-
     // light buffer
     this.lightViewProjectionBuffer = CreateUniformBuffer(4 * 4 * 4); // vp矩阵
     // uniform buffer
     this.uniformBuffer = CreateUniformBuffer(4 * 4 * 4 * 2); // 4*4*4 viewMatrix ; 4*4*4 projectionMatrix
-
     // 全局更新
     this.updateGlobalBindGroup();
-
     // bindgroup @group(1)
     this.lightBindGroupEntries = lightBindGroupEntries(this.shadowTexture);
     this.lightBindGroup = this.device.createBindGroup({
@@ -146,20 +144,24 @@ export class Scene {
     // 全局矩阵
     this.modelMatrixBuffer = CreateStorageBuffer(4 * 4 * 4 * count);
     this.normalMatrixBuffer = CreateStorageBuffer(4 * 4 * 4 * count);
-
+    this.colorBuffer = CreateStorageBuffer(4 * 4 * count);
+    this.receiveShadowBuffer = CreateStorageBuffer(4 * count);
     // bindgroup @group(0)
     this.vsBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
       { binding: 0, resource: this.uniformBuffer },
       { binding: 1, resource: this.lightViewProjectionBuffer },
       { binding: 2, resource: this.modelMatrixBuffer },
       { binding: 3, resource: this.normalMatrixBuffer },
+      { binding: 4, resource: this.colorBuffer },
+      { binding: 5, resource: this.receiveShadowBuffer },
     ]);
-
     this.shadowBindGroup = CreateBindGroupWithLayout(this.vsBindGroupLayout, [
       { binding: 0, resource: this.uniformBuffer },
       { binding: 1, resource: this.lightViewProjectionBuffer },
       { binding: 2, resource: this.modelMatrixBuffer },
       { binding: 3, resource: this.normalMatrixBuffer },
+      { binding: 4, resource: this.colorBuffer },
+      { binding: 5, resource: this.receiveShadowBuffer },
     ]);
   }
 
@@ -276,46 +278,59 @@ export class Scene {
     const normalMatrixArray = new Float32Array(
       4 * 4 * this.getTotalRenderableCount()
     );
+    const colorArray = new Float32Array(4 * this.getTotalRenderableCount());
+    const receiveShadowArray = new Float32Array(this.getTotalRenderableCount());
 
     let globalIndex = 0; // 用于跟踪全局索引
     for (const objectsOfType of this.objects.values()) {
       for (const object of objectsOfType) {
-        modelMatrixArray.set(object.modelMatrix, globalIndex * 4 * 4);
+        modelMatrixArray.set(object.modelMatrix, globalIndex * 4 * 4); // 模型矩阵
         let normalMatrix = mat4.copy(object.modelMatrix);
         normalMatrix = mat4.invert(normalMatrix);
         normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
-        normalMatrixArray.set(normalMatrix, globalIndex * 4 * 4);
+        normalMatrixArray.set(normalMatrix, globalIndex * 4 * 4); // 法线矩阵
+        colorArray.set(object.color.rgba, globalIndex * 4); // 颜色
+        receiveShadowArray.set([object.receiveShadow ? 1 : 0], globalIndex); // 承载阴影
         globalIndex++;
       }
     }
-
     this.updateLightBuffer();
-    this.device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      camera.projectionMatrix as Float32Array
-    );
-    this.device.queue.writeBuffer(
-      this.uniformBuffer,
-      4 * 4 * 4,
-      camera.viewMatrix as Float32Array
-    );
-    this.device.queue.writeBuffer(this.modelMatrixBuffer!, 0, modelMatrixArray);
-    this.device.queue.writeBuffer(
-      this.normalMatrixBuffer!,
-      0,
-      normalMatrixArray
-    );
+    {
+      this.device.queue.writeBuffer(
+        this.uniformBuffer,
+        0,
+        camera.projectionMatrix as Float32Array
+      );
+      this.device.queue.writeBuffer(
+        this.uniformBuffer,
+        4 * 4 * 4,
+        camera.viewMatrix as Float32Array
+      );
+      this.device.queue.writeBuffer(
+        this.modelMatrixBuffer!,
+        0,
+        modelMatrixArray
+      );
+      this.device.queue.writeBuffer(
+        this.normalMatrixBuffer!,
+        0,
+        normalMatrixArray
+      );
+      this.device.queue.writeBuffer(this.colorBuffer!, 0, colorArray);
+      this.device.queue.writeBuffer(
+        this.receiveShadowBuffer!,
+        0,
+        receiveShadowArray
+      );
+    }
     //
     const commandEncoder = this.device.createCommandEncoder();
-
     // 阴影渲染
     const shadowPass = commandEncoder.beginRenderPass(
       CreateShadowRenderPassDescriptor(this.shadowTexture)
     );
     shadowPass.setPipeline(this.shadowPipeline);
     shadowPass.setBindGroup(0, this.shadowBindGroup!);
-
     globalIndex = 0;
     for (const [type, objectsOfType] of this.objects.entries()) {
       for (const object of objectsOfType) {
@@ -333,7 +348,6 @@ export class Scene {
       this.renderDepthTexture
     );
     const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
-
     if (this.renderBundle) {
       renderPass.executeBundles([this.renderBundle]);
     } else {
@@ -345,7 +359,6 @@ export class Scene {
     this.helperObjects.forEach((object) => {
       (object as Axes).render(renderPass, camera);
     });
-
     globalIndex = 0;
     for (const [type, objectsOfType] of this.objects.entries()) {
       for (const object of objectsOfType) {

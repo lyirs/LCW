@@ -26,7 +26,8 @@ const axes = new LCW.Axes(5);
 const plane = new LCW.Box();
 plane.y = -1;
 plane.setScale(new LCW.Vector3(10, 0.1, 10));
-plane.castShadow = true;
+plane.setColor(new LCW.Color("#00e1ff"));
+plane.receiveShadow = true;
 
 const ambientLight = new LCW.AmbientLight();
 ambientLight.setIntensity(0.2);

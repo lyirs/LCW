@@ -12,6 +12,7 @@ export class GeometryBase {
 
   protected _modelMatrix: Mat4 = mat4.identity();
   public castShadow: boolean = false;
+  public receiveShadow: boolean = false;
 
   constructor() {}
 
@@ -30,6 +31,10 @@ export class GeometryBase {
       this._modelMatrix,
       vec3.fromValues(scale.x, scale.y, scale.z)
     );
+  }
+
+  public setColor(color: Color) {
+    this.color = color;
   }
 
   public setPosition(position: Vector3) {

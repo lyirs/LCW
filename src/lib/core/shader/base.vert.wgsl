@@ -26,6 +26,8 @@ struct VertexOutput {
   @location(1) fragNormal: vec3<f32>,
   @location(2) fragUV: vec2<f32>,
   @location(3) shadowPos: vec3<f32>,
+  @location(4) fragColor: vec4<f32>,
+  @location(5) receiveShadow: f32,
 }
 
 @vertex
@@ -44,5 +46,7 @@ fn main(
     output.fragPosition = modelMatrix * vec4(position, 1.0);
     let posFromLight = lightViewProjection * modelMatrix * vec4<f32>(position, 1.0);
     output.shadowPos = vec3<f32>(posFromLight.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5, 0.5), posFromLight.z);
+    output.fragColor = colorArray[index];
+    output.receiveShadow = receiveShadowArray[index];
     return output;
 }

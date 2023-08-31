@@ -1,13 +1,13 @@
-import { mat4, Mat4, vec3 } from "wgpu-matrix";
+import { Matrix4 } from "../math/Matrix4";
 import { Vector3 } from "../math/Vector3";
 
 export class Camera {
-  public _eyePosition = new Vector3(0, 0, 0);
+  private _eyePosition = new Vector3(0, 0, 0);
   private _center = new Vector3(0, 0, 0);
   private _up = new Vector3(0, 1, 0);
-  private _projectionMatrix: Mat4 = mat4.identity();
-  private _viewMatrix: Mat4 = mat4.identity();
-  private _viewProjectionMatrix: Mat4 = mat4.identity();
+  private _projectionMatrix: Matrix4 = Matrix4.identity();
+  private _viewMatrix: Matrix4 = Matrix4.identity();
+  private _viewProjectionMatrix: Matrix4 = Matrix4.identity();
   private _angularSpeed: number = 0.01;
   private _phi: number = Math.PI / 2;
   private _theta: number = Math.PI / 2;
@@ -21,11 +21,11 @@ export class Camera {
 
   constructor() {}
 
-  public get projectionMatrix(): Mat4 {
+  public get projectionMatrix(): Matrix4 {
     return this._projectionMatrix;
   }
 
-  public set projectionMatrix(matrix: Mat4) {
+  public set projectionMatrix(matrix: Matrix4) {
     this._projectionMatrix = matrix;
   }
 
@@ -39,7 +39,7 @@ export class Camera {
     this._aspect = aspect;
     this._near = near;
     this._far = far;
-    const projectionMatrix = mat4.perspective(
+    const projectionMatrix = Matrix4.perspective(
       this._fov,
       this._aspect,
       this._near,
@@ -50,7 +50,7 @@ export class Camera {
 
   public set aspect(aspect: number) {
     this._aspect = aspect;
-    const projectionMatrix = mat4.perspective(
+    const projectionMatrix = Matrix4.perspective(
       this._fov,
       this._aspect,
       this._near,
@@ -67,15 +67,15 @@ export class Camera {
     near: number = 1,
     far: number = 1000
   ) {
-    const projectionMatrix = mat4.ortho(left, right, bottom, top, near, far); // 创建一个正交投影矩阵
+    const projectionMatrix = Matrix4.ortho(left, right, bottom, top, near, far); // 创建一个正交投影矩阵
     this._projectionMatrix = projectionMatrix;
   }
 
-  public get viewMatrix(): Mat4 {
+  public get viewMatrix(): Matrix4 {
     return this._viewMatrix;
   }
 
-  public set viewMatrix(matrix: Mat4) {
+  public set viewMatrix(matrix: Matrix4) {
     this._viewMatrix = matrix;
   }
 
@@ -84,10 +84,10 @@ export class Camera {
     center = new Vector3(0, 0, 0),
     up = new Vector3(0, 1, 0)
   ) {
-    const viewMatrix = mat4.lookAt(
-      vec3.fromValues(eyePosition.x, eyePosition.y, eyePosition.z),
-      vec3.fromValues(center.x, center.y, center.z),
-      vec3.fromValues(up.x, up.y, up.z)
+    const viewMatrix = Matrix4.lookAt(
+      new Vector3(eyePosition.x, eyePosition.y, eyePosition.z),
+      new Vector3(center.x, center.y, center.z),
+      new Vector3(up.x, up.y, up.z)
     );
     this._eyePosition = eyePosition;
     this._center = center;
@@ -95,10 +95,10 @@ export class Camera {
     this._viewMatrix = viewMatrix;
   }
 
-  public get viewProjectionMatrix(): Mat4 {
+  public get viewProjectionMatrix(): Matrix4 {
     const viewMatrix = this._viewMatrix;
     const projectionMatrix = this._projectionMatrix;
-    this._viewProjectionMatrix = mat4.multiply(projectionMatrix, viewMatrix);
+    this._viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
     return this._viewProjectionMatrix;
   }
 
@@ -129,13 +129,13 @@ export class Camera {
 
     this._phi = Math.max(0.01, Math.min(Math.PI - 0.01, this._phi));
 
-    const radius = vec3.distance(
-      vec3.fromValues(
+    const radius = Vector3.distance(
+      new Vector3(
         this._eyePosition.x,
         this._eyePosition.y,
         this._eyePosition.z
       ),
-      vec3.fromValues(0, 0, 0)
+      new Vector3(0, 0, 0)
     );
 
     const x = radius * Math.sin(this._phi) * Math.cos(this._theta);
@@ -153,16 +153,12 @@ export class Camera {
     this.lookAt(this._eyePosition, this._center, this._up);
   }
 
-  public getEyePositionFromViewMatrix() {
-    const invView = mat4.invert(this._viewMatrix);
+  public getEyePositionFromViewMatrix(): Vector3 {
+    const invView = Matrix4.invert(this._viewMatrix);
     if (!invView) {
       throw new Error("Failed to invert the view matrix");
     }
-    const eyePosition = {
-      x: invView[12],
-      y: invView[13],
-      z: invView[14],
-    };
+    const eyePosition = new Vector3(invView[12], invView[13], invView[14]);
     return eyePosition;
   }
 }

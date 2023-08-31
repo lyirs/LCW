@@ -29,6 +29,10 @@ export class Color {
     }
   }
 
+  get rgba(): number[] {
+    return [this.r, this.g, this.b, this.a];
+  }
+
   clone() {
     return new Color(this.r, this.g, this.b, this.a);
   }

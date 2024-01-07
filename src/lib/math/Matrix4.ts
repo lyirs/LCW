@@ -1,3 +1,4 @@
+import { translate } from "wgpu-matrix/dist/2.x/mat3-impl";
 import { Vector3 } from "./Vector3";
 
 export const Matrix4 = {
@@ -66,13 +67,6 @@ export const Matrix4 = {
       0, f, 0, 0,
       0, 0, (far) * rangeInv, -1,
       0, 0, near * far * rangeInv, 0
-    )
-    // prettier-ignore
-    return this.set(
-      f / aspect, 0, 0, 0,
-      0, f, 0, 0,
-      0, 0, (far + near) * rangeInv, -1,
-      0, 0, near * far * rangeInv * 2, 0
     )
   },
 
@@ -335,12 +329,204 @@ export const Matrix4 = {
     const m31 = m[3 * 4 + 1];
     const m32 = m[3 * 4 + 2];
     const m33 = m[3 * 4 + 3];
-  
-    dst[ 0] = m00;  dst[ 1] = m10;  dst[ 2] = m20;  dst[ 3] = m30;
-    dst[ 4] = m01;  dst[ 5] = m11;  dst[ 6] = m21;  dst[ 7] = m31;
-    dst[ 8] = m02;  dst[ 9] = m12;  dst[10] = m22;  dst[11] = m32;
-    dst[12] = m03;  dst[13] = m13;  dst[14] = m23;  dst[15] = m33;
-  
+
+    dst[0] = m00;
+    dst[1] = m10;
+    dst[2] = m20;
+    dst[3] = m30;
+    dst[4] = m01;
+    dst[5] = m11;
+    dst[6] = m21;
+    dst[7] = m31;
+    dst[8] = m02;
+    dst[9] = m12;
+    dst[10] = m22;
+    dst[11] = m32;
+    dst[12] = m03;
+    dst[13] = m13;
+    dst[14] = m23;
+    dst[15] = m33;
+
     return dst;
-  }
+  },
+
+  translate(m: Matrix4, v: Vector3): Matrix4 {
+    const dst = new Float32Array(16);
+    const v0 = v.x;
+    const v1 = v.y;
+    const v2 = v.z;
+    const m00 = m[0];
+    const m01 = m[1];
+    const m02 = m[2];
+    const m03 = m[3];
+    const m10 = m[1 * 4 + 0];
+    const m11 = m[1 * 4 + 1];
+    const m12 = m[1 * 4 + 2];
+    const m13 = m[1 * 4 + 3];
+    const m20 = m[2 * 4 + 0];
+    const m21 = m[2 * 4 + 1];
+    const m22 = m[2 * 4 + 2];
+    const m23 = m[2 * 4 + 3];
+    const m30 = m[3 * 4 + 0];
+    const m31 = m[3 * 4 + 1];
+    const m32 = m[3 * 4 + 2];
+    const m33 = m[3 * 4 + 3];
+
+    if (m !== dst) {
+      dst[0] = m00;
+      dst[1] = m01;
+      dst[2] = m02;
+      dst[3] = m03;
+      dst[4] = m10;
+      dst[5] = m11;
+      dst[6] = m12;
+      dst[7] = m13;
+      dst[8] = m20;
+      dst[9] = m21;
+      dst[10] = m22;
+      dst[11] = m23;
+    }
+    dst[12] = m00 * v0 + m10 * v1 + m20 * v2 + m30;
+    dst[13] = m01 * v0 + m11 * v1 + m21 * v2 + m31;
+    dst[14] = m02 * v0 + m12 * v1 + m22 * v2 + m32;
+    dst[15] = m03 * v0 + m13 * v1 + m23 * v2 + m33;
+
+    return dst;
+  },
+
+  scale(m: Matrix4, v: Vector3): Matrix4 {
+    const dst = new Float32Array(16);
+    const v0 = v.x;
+    const v1 = v.y;
+    const v2 = v.z;
+
+    dst[0] = v0 * m[0 * 4 + 0];
+    dst[1] = v0 * m[0 * 4 + 1];
+    dst[2] = v0 * m[0 * 4 + 2];
+    dst[3] = v0 * m[0 * 4 + 3];
+    dst[4] = v1 * m[1 * 4 + 0];
+    dst[5] = v1 * m[1 * 4 + 1];
+    dst[6] = v1 * m[1 * 4 + 2];
+    dst[7] = v1 * m[1 * 4 + 3];
+    dst[8] = v2 * m[2 * 4 + 0];
+    dst[9] = v2 * m[2 * 4 + 1];
+    dst[10] = v2 * m[2 * 4 + 2];
+    dst[11] = v2 * m[2 * 4 + 3];
+
+    if (m !== dst) {
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  },
+
+  rotateX(m: Matrix4, angleInRadians: number): Matrix4 {
+    const dst = new Float32Array(16);
+    const m10 = m[4];
+    const m11 = m[5];
+    const m12 = m[6];
+    const m13 = m[7];
+    const m20 = m[8];
+    const m21 = m[9];
+    const m22 = m[10];
+    const m23 = m[11];
+    const c = Math.cos(angleInRadians);
+    const s = Math.sin(angleInRadians);
+    dst[4] = c * m10 + s * m20;
+    dst[5] = c * m11 + s * m21;
+    dst[6] = c * m12 + s * m22;
+    dst[7] = c * m13 + s * m23;
+    dst[8] = c * m20 - s * m10;
+    dst[9] = c * m21 - s * m11;
+    dst[10] = c * m22 - s * m12;
+    dst[11] = c * m23 - s * m13;
+
+    if (m !== dst) {
+      dst[0] = m[0];
+      dst[1] = m[1];
+      dst[2] = m[2];
+      dst[3] = m[3];
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  },
+
+  rotateY(m: Matrix4, angleInRadians: number): Matrix4 {
+    const dst = new Float32Array(16);
+    const m00 = m[0 * 4 + 0];
+    const m01 = m[0 * 4 + 1];
+    const m02 = m[0 * 4 + 2];
+    const m03 = m[0 * 4 + 3];
+    const m20 = m[2 * 4 + 0];
+    const m21 = m[2 * 4 + 1];
+    const m22 = m[2 * 4 + 2];
+    const m23 = m[2 * 4 + 3];
+    const c = Math.cos(angleInRadians);
+    const s = Math.sin(angleInRadians);
+
+    dst[0] = c * m00 - s * m20;
+    dst[1] = c * m01 - s * m21;
+    dst[2] = c * m02 - s * m22;
+    dst[3] = c * m03 - s * m23;
+    dst[8] = c * m20 + s * m00;
+    dst[9] = c * m21 + s * m01;
+    dst[10] = c * m22 + s * m02;
+    dst[11] = c * m23 + s * m03;
+
+    if (m !== dst) {
+      dst[4] = m[4];
+      dst[5] = m[5];
+      dst[6] = m[6];
+      dst[7] = m[7];
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  },
+
+  rotateZ(m: Matrix4, angleInRadians: number): Matrix4 {
+    const dst = new Float32Array(16);
+    const m00 = m[0 * 4 + 0];
+    const m01 = m[0 * 4 + 1];
+    const m02 = m[0 * 4 + 2];
+    const m03 = m[0 * 4 + 3];
+    const m10 = m[1 * 4 + 0];
+    const m11 = m[1 * 4 + 1];
+    const m12 = m[1 * 4 + 2];
+    const m13 = m[1 * 4 + 3];
+    const c = Math.cos(angleInRadians);
+    const s = Math.sin(angleInRadians);
+
+    dst[0] = c * m00 + s * m10;
+    dst[1] = c * m01 + s * m11;
+    dst[2] = c * m02 + s * m12;
+    dst[3] = c * m03 + s * m13;
+    dst[4] = c * m10 - s * m00;
+    dst[5] = c * m11 - s * m01;
+    dst[6] = c * m12 - s * m02;
+    dst[7] = c * m13 - s * m03;
+
+    if (m !== dst) {
+      dst[8] = m[8];
+      dst[9] = m[9];
+      dst[10] = m[10];
+      dst[11] = m[11];
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  },
 };

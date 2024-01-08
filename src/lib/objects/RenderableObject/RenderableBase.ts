@@ -1,4 +1,3 @@
-import { mat4, Mat4, vec3 } from "wgpu-matrix";
 import { Camera } from "../../core/Camera";
 import { GPUManager } from "../../core/GPUManager";
 import {
@@ -11,11 +10,12 @@ import fragWGSL from "./shader/wireframe.frag.wgsl?raw";
 import { GeometryBase } from "../GeometryBase";
 import { Box, Cube } from "./Box";
 import { Sphere } from "./Sphere";
+import { Matrix4 } from "../../math/Matrix4";
 
 export type Renderable = Cube | Box | Sphere;
 
 export class RenderableObject extends GeometryBase {
-  protected _modelMatrix: Mat4 = mat4.identity(); // 模型矩阵
+  protected _modelMatrix: Matrix4 = Matrix4.identity(); // 模型矩阵
   protected vertices: Float32Array | undefined;
   protected indices: Uint16Array | undefined;
   protected renderBuffer: { vertex: GPUBuffer; index: GPUBuffer } | undefined;
@@ -34,7 +34,7 @@ export class RenderableObject extends GeometryBase {
     this.device = device;
   }
 
-  public get modelMatrix(): Mat4 {
+  public get modelMatrix(): Matrix4 {
     return this._modelMatrix;
   }
 
@@ -155,8 +155,11 @@ export class RenderableObject extends GeometryBase {
     renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
     camera: Camera
   ) {
-    const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
-    const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;
+    const vpMatrix = Matrix4.multiply(
+      camera.projectionMatrix,
+      camera.viewMatrix
+    );
+    const mvpMatrix = Matrix4.multiply(vpMatrix, this.modelMatrix);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, mvpMatrix);
     renderPass.setPipeline(this.wireframePipeline!);
     renderPass.setBindGroup(0, this.uniformBindGroup);

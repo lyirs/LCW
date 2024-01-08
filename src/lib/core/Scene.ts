@@ -1,5 +1,4 @@
 import Stats from "stats.js";
-import { mat4 } from "wgpu-matrix";
 import {
   CreateBindGroupWithLayout,
   CreateFragmentBindGroupLayout,
@@ -40,6 +39,7 @@ import { PointLight } from "../light/PointLight";
 import { Vector3 } from "../math/Vector3";
 import { Renderable } from "../objects/RenderableObject/RenderableBase";
 import { CreateRenderBundle } from "../auxiliary/renderBundle";
+import { Matrix4 } from "../math/Matrix4";
 
 export class Scene {
   private stats: Stats | undefined; // 性能数据显示
@@ -285,9 +285,9 @@ export class Scene {
     for (const objectsOfType of this.objects.values()) {
       for (const object of objectsOfType) {
         modelMatrixArray.set(object.modelMatrix, globalIndex * 4 * 4); // 模型矩阵
-        let normalMatrix = mat4.copy(object.modelMatrix);
-        normalMatrix = mat4.invert(normalMatrix);
-        normalMatrix = mat4.transpose(normalMatrix) as Float32Array;
+        let normalMatrix = Matrix4.copy(object.modelMatrix);
+        normalMatrix = Matrix4.invert(normalMatrix);
+        normalMatrix = Matrix4.transpose(normalMatrix);
         normalMatrixArray.set(normalMatrix, globalIndex * 4 * 4); // 法线矩阵
         colorArray.set(object.color.rgba, globalIndex * 4); // 颜色
         receiveShadowArray.set([object.receiveShadow ? 1 : 0], globalIndex); // 承载阴影

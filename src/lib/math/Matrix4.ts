@@ -1,4 +1,3 @@
-import { translate } from "wgpu-matrix/dist/2.x/mat3-impl";
 import { Vector3 } from "./Vector3";
 
 export const Matrix4 = {
@@ -80,10 +79,10 @@ export const Matrix4 = {
   ) {
     // prettier-ignore
     return this.set(
-      2 / (right - left),    0,                   0,                  (right + left) / (left - right),
-      0,                     2 / (top - bottom),  0,                  (top + bottom) / (bottom - top),
-      0,                     0,                   1 / (near - far),   near / (near - far),
-      0,                     0,                   0,                  1
+      2 / (right - left),                 0,                                  0,                        0,
+      0,                                  2 / (top - bottom),                 0,                        0,
+      0,                                  0,                                  1 / (near - far),         0,
+      (right + left) / (left - right),    (top + bottom) / (bottom - top),    near / (near - far),      1
     )
   },
 

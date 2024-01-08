@@ -5,10 +5,10 @@ import {
   CreateUniformBuffer,
 } from "../../auxiliary/gpuBuffer";
 import { Camera } from "../../core/Camera";
-import { Mat4, mat4, vec3 } from "wgpu-matrix";
 import { GPUManager } from "../../core/GPUManager";
 import { Vector3 } from "../../math/Vector3";
 import { GeometryBase } from "../GeometryBase";
+import { Matrix4 } from "../../math/Matrix4";
 
 // prettier-ignore
 const axesVertexArray = new Float32Array([
@@ -117,9 +117,12 @@ export class Axes extends GeometryBase {
     renderPass: GPURenderPassEncoder | GPURenderBundleEncoder,
     camera: Camera
   ) {
-    const vpMatrix = mat4.multiply(camera.projectionMatrix, camera.viewMatrix);
+    const vpMatrix = Matrix4.multiply(
+      camera.projectionMatrix,
+      camera.viewMatrix
+    );
 
-    const mvpMatrix = mat4.multiply(vpMatrix, this.modelMatrix) as Float32Array;
+    const mvpMatrix = Matrix4.multiply(vpMatrix, this.modelMatrix);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, mvpMatrix);
     renderPass.setPipeline(this.pipeline);
     renderPass.setBindGroup(0, this.uniformBindGroup);

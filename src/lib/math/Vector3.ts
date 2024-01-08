@@ -41,6 +41,10 @@ export class Vector3 {
     return this.z;
   }
 
+  public get xyz(): number[] {
+    return [this.x, this.y, this.z];
+  }
+
   public copy(v: Vector3): Vector3 {
     this.x = v.x;
     this.y = v.y;

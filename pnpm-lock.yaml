@@ -7,9 +7,6 @@ dependencies:
   stats.js:
     specifier: ^0.17.0
     version: 0.17.0
-  wgpu-matrix:
-    specifier: ^2.5.0
-    version: 2.5.0
 
 devDependencies:
   '@types/dat.gui':
@@ -355,7 +352,3 @@ packages:
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
-
-  /wgpu-matrix@2.5.0:
-    resolution: {integrity: sha512-2y/yyQwEX4m00SD9U00Rdm2p+5D0vMAJqqT0zsmVD+8ndYLEA+AhL2cG99CUWBuuMddLazukBHCvL3qi1bi0nQ==}
-    dev: false

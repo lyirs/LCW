@@ -1,8 +1,8 @@
-import { Mat4, mat4, vec3 } from "wgpu-matrix";
 import { GPUManager } from "../core/GPUManager";
 import { AmbientLight } from "../light/AmbientLight";
 import { DirectionalLight } from "../light/DirectionalLight";
 import { PointLight } from "../light/PointLight";
+import { Matrix4 } from "../math/Matrix4";
 import { Vector3 } from "../math/Vector3";
 import { CreateUniformBuffer } from "./gpuBuffer";
 
@@ -23,7 +23,6 @@ export const LightConfigs: Record<LightType, LightConfig> = {
   [LightType.POINT]: { size: 8, buffer: null },
   [LightType.DIRECTIONAL]: { size: 8, buffer: null },
 };
-
 
 export type Light = AmbientLight | PointLight | DirectionalLight;
 
@@ -65,16 +64,16 @@ export const lightBindGroupEntries = (shadowTexture: GPUTexture) => {
 export const getLightViewProjectionMatrix = (
   lightPos: Vector3
 ): Float32Array => {
-  const lightPosition = vec3.fromValues(lightPos.x, lightPos.y, lightPos.z);
-  const lightViewMatrix = mat4.identity();
-  mat4.lookAt(
+  const lightPosition = new Vector3(lightPos.x, lightPos.y, lightPos.z);
+  const lightViewMatrix = Matrix4.lookAt(
     lightPosition,
-    vec3.fromValues(0, 0, 0),
-    vec3.fromValues(0, 1, 0),
+    new Vector3(0, 0, 0),
+    new Vector3(0, 1, 0)
+  );
+  let lightProjectionMatrix = Matrix4.ortho(-40, 40, -40, 40, -50, 200);
+  lightProjectionMatrix = Matrix4.multiply(
+    lightProjectionMatrix,
     lightViewMatrix
   );
-  const lightProjectionMatrix = mat4.identity();
-  mat4.ortho(-40, 40, -40, 40, -50, 200, lightProjectionMatrix);
-  mat4.multiply(lightProjectionMatrix, lightViewMatrix, lightProjectionMatrix);
   return lightProjectionMatrix as Float32Array;
 };

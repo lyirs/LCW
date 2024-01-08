@@ -1,8 +1,8 @@
-import { mat4, vec3 } from "wgpu-matrix";
 import {
   CreateGPUBufferF32,
   CreateGPUBufferUint16,
 } from "../../auxiliary/gpuBuffer";
+import { Vector3 } from "../../math/Vector3";
 import { RenderableObject } from "./RenderableBase";
 
 const createSphere = (
@@ -17,9 +17,9 @@ const createSphere = (
   widthSegments = Math.max(3, Math.floor(widthSegments));
   heightSegments = Math.max(2, Math.floor(heightSegments));
 
-  const firstVertex = vec3.create();
-  const vertex = vec3.create();
-  const normal = vec3.create();
+  var firstVertex = new Vector3();
+  var vertex = new Vector3();
+  var normal = new Vector3();
 
   let index = 0;
   // grid 数组用于存储每一行顶点的索引，构建了一个高度分段 x 宽度分段的矩阵结构。
@@ -53,26 +53,26 @@ const createSphere = (
       const u = ix / widthSegments;
 
       if (ix == widthSegments) {
-        vec3.copy(firstVertex, vertex);
+        vertex = vertex.copy(firstVertex);
       } else if (ix == 0 || (iy != 0 && iy !== heightSegments)) {
         const rr = radius + (Math.random() - 0.5) * 2 * randomness * radius;
 
-        vertex[0] = -rr * Math.cos(u * Math.PI * 2) * Math.sin(v * Math.PI);
-        vertex[1] = rr * Math.cos(v * Math.PI);
-        vertex[2] = rr * Math.sin(u * Math.PI * 2) * Math.sin(v * Math.PI);
+        vertex.x = -rr * Math.cos(u * Math.PI * 2) * Math.sin(v * Math.PI);
+        vertex.y = rr * Math.cos(v * Math.PI);
+        vertex.z = rr * Math.sin(u * Math.PI * 2) * Math.sin(v * Math.PI);
 
         if (ix == 0) {
-          vec3.copy(vertex, firstVertex);
+          firstVertex = firstVertex.copy(vertex);
         }
       }
 
-      vertices.push(...vertex);
+      vertices.push(...vertex.xyz);
 
       // normal
       // 复制当前顶点坐标到 normal，然后对 normal 进行规范化，以计算出法线向量
-      vec3.copy(vertex, normal);
-      vec3.normalize(normal, normal);
-      vertices.push(...normal);
+      normal = normal.copy(vertex);
+      normal = normal.normalize();
+      vertices.push(...normal.xyz);
 
       // uv
       vertices.push(u + uOffset, 1 - v);

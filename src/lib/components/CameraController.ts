@@ -1,4 +1,4 @@
-import { Camera } from "../core/Camera"; // 假设你的相机类在这个路径下
+import { Camera } from "../core/Camera"; 
 
 export class CameraController {
   private camera: Camera;
